@@ -5,11 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Peşinat Takip Tablosu (ONLINE - FIREBASE)</title>
     
+    <!-- Tailwind CSS (Tasarım için) -->
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <!-- React & ReactDOM (Uygulama motoru) -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
+    <!-- Babel (JSX Derleyicisi) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
@@ -18,47 +21,49 @@
         @media print {
             .no-print { display: none !important; }
         }
+        /* Scrollbar düzenlemesi */
+        .history-scroll::-webkit-scrollbar { width: 6px; }
+        .history-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
+        .history-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800">
 
     <div id="root"></div>
 
+    <!-- FIREBASE VE UYGULAMA KODU -->
     <script type="text/babel" data-type="module">
-        // --- FIREBASE KÜTÜPHANELERİ ---
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        // --- FIREBASE BAĞLANTILARI (CDN) ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         // =================================================================
-        // --- BURAYI KENDİ BİLGİLERİNLE DEĞİŞTİR (BAŞLANGIÇ) ---
-       const firebaseConfig = {
-  apiKey: "AIzaSyDEGpqDzFjMMJxqey1nG5kWearDmZsSNao",
-  authDomain: "pesinatdokumu.firebaseapp.com",
-  projectId: "pesinatdokumu",
-  storageBucket: "pesinatdokumu.firebasestorage.app",
-  messagingSenderId: "619959488442",
-  appId: "1:619959488442:web:4b787b415d023c2c4c5783",
-  measurementId: "G-XX93ZSFYK2"
-};
-        
-        // --- BURAYI KENDİ BİLGİLERİNLE DEĞİŞTİR (BİTİŞ) ---
+        // --- SENİN BİLGİLERİN (OTOMATİK YERLEŞTİRİLDİ) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDEGpqDzFjMMJxqey1nG5kWearDmZsSNao",
+            authDomain: "pesinatdokumu.firebaseapp.com",
+            projectId: "pesinatdokumu",
+            storageBucket: "pesinatdokumu.firebasestorage.app",
+            messagingSenderId: "619959488442",
+            appId: "1:619959488442:web:4b787b415d023c2c4c5783",
+            measurementId: "G-XX93ZSFYK2"
+        };
         // =================================================================
 
         // Firebase'i Başlat
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const DB_COLLECTION = "pesinatlar"; // Veritabanındaki tablo adı
+        const DB_COLLECTION = "pesinatlar"; // Verilerin kaydedileceği tablo ismi
 
         const { useState, useEffect, useRef, useMemo } = React;
         
-        // --- İKONLAR (Değişmedi) ---
+        // --- İKON TANIMLARI ---
         const ICON_PATHS = {
             'trash-2': <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>,
             'plus-circle': <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></>,
             'user': <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
             'building-2': <><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></>,
             'download': <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
-            'upload': <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>,
             'cloud': <><path d="M17.5 19c0-3.037-2.463-5.5-5.5-5.5S6.5 15.963 6.5 19"/><path d="M17.5 19c3.037 0 5.5-2.463 5.5-5.5S20.537 8 17.5 8h-1.7c-1.3-3.5-4.9-6-8.8-6-5.5 0-10 4.5-10 10 0 1.5.4 3 1 4.2"/></>,
             'search': <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
             'check-circle-2': <><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></>,
@@ -75,8 +80,8 @@
             'paperclip': <><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></>,
             'lock': <><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
             'log-in': <><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></>,
-            'hard-drive': <><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></>,
-            'wallet': <><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4v-8Z"/></>
+            'wallet': <><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4v-8Z"/></>,
+            'history': <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></>
         };
 
         const Icon = ({ name, size = 20, className, ...props }) => {
@@ -96,7 +101,6 @@
             Building2: (p) => <Icon name="building-2" {...p} />,
             Wallet: (p) => <Icon name="wallet" {...p} />,
             Download: (p) => <Icon name="download" {...p} />,
-            Upload: (p) => <Icon name="upload" {...p} />,
             Cloud: (p) => <Icon name="cloud" {...p} />,
             Search: (p) => <Icon name="search" {...p} />,
             CheckCircle2: (p) => <Icon name="check-circle-2" {...p} />,
@@ -113,17 +117,17 @@
             Paperclip: (p) => <Icon name="paperclip" {...p} />,
             Lock: (p) => <Icon name="lock" {...p} />,
             LogIn: (p) => <Icon name="log-in" {...p} />,
-            HardDrive: (p) => <Icon name="hard-drive" {...p} />
+            History: (p) => <Icon name="history" {...p} />
         };
 
-        // --- MAIN APPLICATION COMPONENT ---
+        // --- ANA UYGULAMA ---
         function MainApp() {
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             const [loginId, setLoginId] = useState('');
             const [loginPass, setLoginPass] = useState('');
             const [loginError, setLoginError] = useState('');
 
-            // LocalStorage yerine boş dizi ile başlıyoruz, Firebase'den dolduracağız
+            // LocalStorage yerine boş dizi, Firebase'den dolacak
             const [entries, setEntries] = useState([]);
             const [isLoading, setIsLoading] = useState(true);
             
@@ -148,12 +152,14 @@
             const fileInputRef = useRef(null);
             const editFileInputRef = useRef(null);
 
-            // --- FIREBASE VERİ ÇEKME (CANLI TAKİP) ---
+            // Yardımcı format fonksiyonu (Tarih ve Para Birimi için)
+            const formatCurrency = (val) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
+
+            // --- FIREBASE: CANLI VERİ DİNLEME ---
             useEffect(() => {
                 if (!isAuthenticated) return;
 
-                // Veritabanındaki 'pesinatlar' tablosunu dinle
-                // orderBy('createdAt', 'desc') -> En yeni eklenen en üstte
+                // Veritabanını dinlemeye başla
                 const q = query(collection(db, DB_COLLECTION));
                 
                 const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -162,46 +168,54 @@
                         ...doc.data()
                     }));
                     
-                    // Client tarafında tarihe göre sıralayalım (Opsiyonel)
-                    loadedData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                    // SIRALAMA MANTIĞI GÜNCELLENDİ: MAKBUZ NO'YA GÖRE (BÜYÜKTEN KÜÇÜĞE)
+                    // Makbuz numaraları string olsa bile ("000005") düzgün sıralanması için parseInt kullanıyoruz
+                    loadedData.sort((a, b) => {
+                        const numA = parseInt(a.receiptNo || "0", 10);
+                        const numB = parseInt(b.receiptNo || "0", 10);
+                        return numB - numA; // Azalan sıralama (En yeni/büyük numara en üstte)
+                    });
                     
                     setEntries(loadedData);
                     setIsLoading(false);
                 }, (error) => {
                     console.error("Veri çekme hatası:", error);
-                    alert("Veriler yüklenirken hata oluştu: " + error.message);
+                    if(error.code === 'permission-denied') {
+                        alert("Erişim Reddedildi! Firebase konsolundan kuralları 'Test Mode' yaptığınızdan emin olun.");
+                    } else {
+                        alert("Veri hatası: " + error.message);
+                    }
                     setIsLoading(false);
                 });
 
-                // Sayfa kapanırken dinlemeyi durdur
                 return () => unsubscribe();
             }, [isAuthenticated]);
 
-            // Otomatik Makbuz No
+            // Otomatik Makbuz No Mantığı (000001'den başla ve artır)
+            // Bu fonksiyon hem başlangıçta hem de kayıt eklendikten sonra çalışır
             useEffect(() => {
-                if (entries.length > 0) {
+                // Sadece form boşken (yeni işlem sırasında) ve kullanıcı bir şey yazmıyorken güncelle
+                if (!formData.staffName && !formData.amount && !formData.customerName) {
                     let maxReceiptNo = 0;
-                    entries.forEach(entry => {
-                        const num = parseInt(entry.receiptNo || "0", 10);
-                        if (!isNaN(num) && num > maxReceiptNo) {
-                            maxReceiptNo = num;
-                        }
-                    });
-                    const nextNo = (maxReceiptNo + 1).toString().padStart(6, '0');
                     
-                    setFormData(prev => {
-                        if (!prev.staffName && !prev.amount && !prev.customerName) {
-                            return { ...prev, receiptNo: nextNo };
-                        }
-                        return prev;
-                    });
+                    if (entries.length > 0) {
+                        entries.forEach(entry => {
+                            const num = parseInt(entry.receiptNo || "0", 10);
+                            if (!isNaN(num) && num > maxReceiptNo) {
+                                maxReceiptNo = num;
+                            }
+                        });
+                    }
+                    
+                    const nextNo = (maxReceiptNo + 1).toString().padStart(6, '0');
+                    setFormData(prev => ({ ...prev, receiptNo: nextNo }));
                 }
-            }, [entries]);
+            }, [entries, formData.staffName, formData.amount, formData.customerName]); 
+            // Dependency array güncellendi: Giriş yapıldığında numara değişmesin diye kontrol eklendi.
 
             // --- GİRİŞ FONKSİYONU ---
             const handleLogin = (e) => {
                 e.preventDefault();
-                // Basit şifreleme (Geliştirilebilir)
                 if (loginId === '1052519451' && loginPass === 'icardi1905') {
                     setIsAuthenticated(true);
                     setLoginError('');
@@ -210,11 +224,11 @@
                 }
             };
 
-            // --- DOSYA YÜKLEME ---
+            // --- RESİM YÜKLEME ---
             const handleImageUpload = (file, callback) => {
                 if (!file) return;
-                // Veritabanı şişmesin diye limit: 1MB
-                if (file.size > 1 * 1024 * 1024) { alert("Dosya boyutu çok büyük! Lütfen 1MB'dan küçük bir resim seçin."); return; }
+                // Dosya boyutu kontrolü (1MB Limit)
+                if (file.size > 1 * 1024 * 1024) { alert("Resim çok büyük! Lütfen 1MB'dan küçük bir resim seçin."); return; }
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     const img = new Image();
@@ -226,7 +240,7 @@
                         canvas.width = width; canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        // Kaliteyi biraz daha düşürdük (0.5) yer kaplamasın diye
+                        // Kaliteyi %50'ye düşür
                         callback(canvas.toDataURL('image/jpeg', 0.5));
                     };
                     img.src = e.target.result;
@@ -238,7 +252,7 @@
             const handleFileChange = (e) => { const file = e.target.files[0]; handleImageUpload(file, (base64) => { setFormData(prev => ({ ...prev, image: base64 })); }); };
             const handleEditFileChange = (e) => { const file = e.target.files[0]; handleImageUpload(file, (base64) => { setEditingItem(prev => ({ ...prev, image: base64 })); }); };
 
-            // --- YENİ KAYIT EKLEME (FIREBASE) ---
+            // --- KAYDETME (FIREBASE) ---
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 if (!formData.staffName || !formData.amount) return;
@@ -252,18 +266,30 @@
                         createdAt: new Date().toISOString()
                     };
 
-                    // Firebase'e ekle
+                    // Veritabanına Ekle
                     await addDoc(collection(db, DB_COLLECTION), newEntry);
                     
-                    // Formu temizle (Liste otomatik güncellenecek)
+                    // --- KRİTİK DÜZELTME: BİR SONRAKİ NUMARAYI HEMEN HESAPLA ---
+                    // Veritabanından gelmesini beklemeden arayüzde hemen göster
                     const currentNo = parseInt(formData.receiptNo || "0", 10);
                     const nextNo = (currentNo + 1).toString().padStart(6, '0');
-                    setFormData({ receiptNo: nextNo, date: formData.date, staffName: '', office: '', customerName: '', amount: '', image: null });
+
+                    // Formu sıfırla ve YENİ NUMARAYI AT
+                    setFormData({ 
+                        receiptNo: nextNo, // <--- BURASI DEĞİŞTİ, eskisi yerine yenisini koyuyoruz
+                        date: formData.date, 
+                        staffName: '', 
+                        office: '', 
+                        customerName: '', 
+                        amount: '', 
+                        image: null 
+                    });
+
                     if (fileInputRef.current) fileInputRef.current.value = "";
                     
                 } catch (error) {
                     console.error("Ekleme hatası:", error);
-                    alert("Kayıt eklenirken bir hata oluştu: " + error.message);
+                    alert("Kayıt eklenemedi: " + error.message);
                 }
             };
 
@@ -275,19 +301,33 @@
                     await deleteDoc(doc(db, DB_COLLECTION, deleteConfirmId));
                     setDeleteConfirmId(null);
                 } catch (error) {
-                    console.error("Silme hatası:", error);
-                    alert("Silinirken hata oluştu.");
+                    alert("Silinemedi: " + error.message);
                 }
             };
 
             const handleEditClick = (item) => setEditingItem({ ...item, original: { ...item } });
             const handleEditChange = (e) => { const { name, value } = e.target; setEditingItem(prev => ({ ...prev, [name]: value })); };
 
-            // --- GÜNCELLEME (FIREBASE) ---
+            // --- GÜNCELLEME (FIREBASE) - DETAYLI LOG İLE ---
             const saveEdit = async () => {
                 if (!editingItem) return;
                 try {
-                    const historyEntry = { updatedAt: new Date().toISOString(), action: 'Düzenleme' };
+                    // --- DEĞİŞİKLİKLERİ TESPİT ET ---
+                    const changes = [];
+                    const oldData = editingItem.original;
+                    const newData = editingItem;
+
+                    if (oldData.receiptNo !== newData.receiptNo) changes.push(`Makbuz No: ${oldData.receiptNo} -> ${newData.receiptNo}`);
+                    if (oldData.date !== newData.date) changes.push(`Tarih değişti`);
+                    if (parseFloat(oldData.amount) !== parseFloat(newData.amount)) changes.push(`Tutar: ${formatCurrency(oldData.amount)} -> ${formatCurrency(newData.amount)}`);
+                    if (oldData.staffName !== newData.staffName) changes.push(`Personel: ${oldData.staffName} -> ${newData.staffName}`);
+                    if (oldData.customerName !== newData.customerName) changes.push(`Müşteri: ${oldData.customerName} -> ${newData.customerName}`);
+                    if (oldData.office !== newData.office) changes.push(`Ofis: ${oldData.office} -> ${newData.office}`);
+                    if (oldData.status !== newData.status) changes.push(`Durum: ${oldData.status} -> ${newData.status}`);
+                    if (oldData.image !== newData.image) changes.push(`Dekont görseli değiştirildi`);
+
+                    const actionText = changes.length > 0 ? changes.join(', ') : 'Düzenleme yapıldı (Detaysız)';
+                    const historyEntry = { updatedAt: new Date().toISOString(), action: actionText };
                     
                     const updateData = {
                         receiptNo: editingItem.receiptNo,
@@ -304,22 +344,21 @@
                     await updateDoc(doc(db, DB_COLLECTION, editingItem.id), updateData);
                     setEditingItem(null);
                 } catch (error) {
-                    console.error("Güncelleme hatası:", error);
-                    alert("Güncellenirken hata oluştu.");
+                    alert("Güncellenemedi: " + error.message);
                 }
             };
 
             const toggleStatus = async (entry) => { 
                 try {
                     const newStatus = entry.status === 'Teslim Edildi' ? 'Teslim Edilmedi' : 'Teslim Edildi'; 
-                    const historyEntry = { updatedAt: new Date().toISOString(), type: 'status_change', oldData: { ...entry } };
+                    const historyEntry = { updatedAt: new Date().toISOString(), action: 'Durum Değişti: ' + newStatus };
                     
                     await updateDoc(doc(db, DB_COLLECTION, entry.id), {
                         status: newStatus,
                         history: [...(entry.history || []), historyEntry]
                     });
                 } catch (error) {
-                    console.error("Durum hatası:", error);
+                    console.error(error);
                 }
             };
 
@@ -339,7 +378,6 @@
                 return (receipt.includes(term) || e.staffName.toLowerCase().includes(term) || e.customerName.toLowerCase().includes(term) || (e.office || '').toLowerCase().includes(term) || status.includes(term)) && matchesDate;
             });
 
-            const formatCurrency = (val) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
             const totalAmount = filteredEntries.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
             
             const stats = useMemo(() => {
@@ -352,14 +390,14 @@
                 return { totalRevenue, monthlyRevenue, officeStats, sortedStaff };
             }, [entries]);
 
-            // --- LOGIN SCREEN ---
+            // --- GİRİŞ EKRANI ---
             if (!isAuthenticated) {
                 return (
                     <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
                         <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200">
                             <div className="flex justify-center mb-6"><div className="bg-blue-100 p-4 rounded-full"><Icons.Cloud className="w-8 h-8 text-blue-600" /></div></div>
                             <h2 className="text-2xl font-bold text-center text-slate-800 mb-2">Bulut Giriş</h2>
-                            <p className="text-center text-slate-500 mb-6 text-sm">Verileriniz güvenli sunucuda saklanmaktadır.</p>
+                            <p className="text-center text-slate-500 mb-6 text-sm">PesinatDokumu - Firebase Bağlantılı</p>
                             <form onSubmit={handleLogin} className="space-y-4">
                                 <div><label className="block text-sm font-medium text-slate-700 mb-1">Kullanıcı ID</label><div className="relative"><div className="absolute left-3 top-3 w-4 h-4 text-slate-400"><Icons.User className="w-4 h-4" /></div><input type="text" value={loginId} onChange={(e) => setLoginId(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="ID giriniz" autoFocus /></div></div>
                                 <div><label className="block text-sm font-medium text-slate-700 mb-1">Şifre</label><div className="relative"><div className="absolute left-3 top-3 w-4 h-4 text-slate-400"><Icons.Ticket className="w-4 h-4" /></div><input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="••••••••" /></div></div>
@@ -372,10 +410,11 @@
                 );
             }
 
+            // --- ANA EKRAN ---
             return (
                 <div className="min-h-screen bg-slate-50 p-4 md:p-8 relative">
                     {/* MODALLAR */}
-                    {deleteConfirmId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full"><h3 className="text-lg font-bold text-slate-900 text-center">Emin misiniz?</h3><p className="text-slate-500 mt-1 text-sm text-center">Bu kayıt kalıcı olarak silinecek.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setDeleteConfirmId(null)} className="flex-1 py-2 bg-slate-100 rounded text-slate-700">İptal</button><button onClick={confirmDelete} className="flex-1 py-2 bg-red-600 text-white rounded">Sil</button></div></div></div>)}
+                    {deleteConfirmId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full"><h3 className="text-lg font-bold text-slate-900 text-center">Emin misiniz?</h3><p className="text-slate-500 mt-1 text-sm text-center">Bu kayıt veritabanından kalıcı olarak silinecek.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setDeleteConfirmId(null)} className="flex-1 py-2 bg-slate-100 rounded text-slate-700">İptal</button><button onClick={confirmDelete} className="flex-1 py-2 bg-red-600 text-white rounded">Sil</button></div></div></div>)}
                     {imagePreviewUrl && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setImagePreviewUrl(null)}><div className="bg-white p-2 rounded-lg max-w-3xl max-h-[90vh] overflow-auto"><img src={imagePreviewUrl} alt="Dekont" className="max-w-full h-auto rounded" /><div className="text-center mt-2 text-sm text-slate-500">Kapatmak için dışarı tıklayın</div></div></div>)}
                     {editingItem && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -396,6 +435,27 @@
                                         </div>
                                     </div>
                                     <div className="space-y-2"><label className="text-sm font-semibold">Durum</label><select name="status" value={editingItem.status} onChange={handleEditChange} className="w-full p-2.5 border rounded-lg bg-white"><option value="Teslim Edilmedi">Teslim Edilmedi</option><option value="Teslim Edildi">Teslim Edildi</option></select></div>
+                                    
+                                    {/* --- GEÇMİŞ İŞLEMLER BÖLÜMÜ --- */}
+                                    <div className="col-span-1 md:col-span-2 mt-4 border-t border-slate-100 pt-4">
+                                        <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                            <Icons.History className="w-4 h-4" /> İşlem Geçmişi
+                                        </h4>
+                                        {editingItem.history && editingItem.history.length > 0 ? (
+                                            <div className="bg-slate-50 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2 history-scroll border border-slate-100">
+                                                {editingItem.history.slice().reverse().map((h, index) => (
+                                                    <div key={index} className="text-xs text-slate-600 flex justify-between items-center border-b border-slate-200 last:border-0 pb-1.5 mb-1.5 last:pb-0 last:mb-0">
+                                                        <span className="font-medium flex-1">{h.action || (h.type === 'status_change' ? 'Durum Değişti' : 'Düzenleme Yapıldı')}</span>
+                                                        <span className="text-slate-400 font-mono text-[10px] ml-2">{new Date(h.updatedAt).toLocaleString('tr-TR')}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-xs text-slate-400 italic p-2">Henüz geçmiş işlem kaydı yok.</div>
+                                        )}
+                                    </div>
+                                    {/* --------------------------------- */}
+
                                 </div>
                                 <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-xl"><button onClick={() => setEditingItem(null)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-200 rounded-lg font-medium">İptal</button><button onClick={saveEdit} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2"><Icons.Save className="w-4 h-4" /> Kaydet</button></div>
                             </div>
@@ -405,7 +465,7 @@
                     {/* HEADER */}
                     <div className="max-w-6xl mx-auto space-y-6">
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
-                            <div><h1 className="text-2xl font-bold text-blue-900 flex items-center gap-2"><Icons.Cloud className="w-8 h-8 text-blue-600" /> Peşinat Tablosu (Online)</h1><p className="text-slate-500 text-sm mt-1 flex items-center gap-1"><Icons.CheckCircle2 className="w-3 h-3 text-green-500" /> Veriler bulutta saklanıyor</p></div>
+                            <div><h1 className="text-2xl font-bold text-blue-900 flex items-center gap-2"><Icons.Cloud className="w-8 h-8 text-blue-600" /> Peşinat Tablosu (Online)</h1><p className="text-slate-500 text-sm mt-1 flex items-center gap-1"><Icons.CheckCircle2 className="w-3 h-3 text-green-500" /> Veriler pesinatdokumu sunucusunda</p></div>
                             <div className="flex flex-wrap items-center gap-2 bg-slate-100 p-1 rounded-lg">
                                 <button onClick={() => setViewMode('list')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'list' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}><Icons.List className="w-4 h-4" /> Liste</button>
                                 <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'dashboard' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}><Icons.LayoutDashboard className="w-4 h-4" /> İstatistikler</button>
