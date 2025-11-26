@@ -16,7 +16,16 @@
                         slate: { 850: '#151e2e', 950: '#020617' }
                     }
                 }
-            }
+            },
+            safelist: [
+                // Grafik ve tema renklerini garantiye almak için açık liste
+                'bg-blue-500', 'bg-blue-600', 'bg-blue-100', 'text-blue-600', 'text-blue-500', 'text-blue-900',
+                'bg-emerald-500', 'bg-emerald-600', 'bg-emerald-100', 'text-emerald-600', 'text-emerald-500', 'text-emerald-900',
+                'bg-violet-500', 'bg-violet-600', 'bg-violet-100', 'text-violet-600', 'text-violet-500', 'text-violet-900',
+                'bg-amber-500', 'bg-amber-600', 'bg-amber-100', 'text-amber-600', 'text-amber-500', 'text-amber-900',
+                'dark:bg-blue-600', 'dark:bg-emerald-600', 'dark:bg-violet-600', 'dark:bg-amber-600',
+                'dark:text-blue-300', 'dark:text-emerald-300', 'dark:text-violet-300', 'dark:text-amber-300'
+            ]
         }
     </script>
     
@@ -29,8 +38,7 @@
 
     <!-- jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://rawgit.com/MrRio/jsPDF/master/font_generator/font_generator.js"></script>
-
+    
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -43,9 +51,16 @@
         .bar-animate { animation: growUp 1s ease-out forwards; }
     </style>
 </head>
-<body>
+<body class="bg-slate-50 text-slate-800">
 
     <div id="root"></div>
+
+    <!-- HATA YAKALAYICI -->
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error("Hata:", message, error);
+        };
+    </script>
 
     <script type="text/babel" data-type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
@@ -64,13 +79,11 @@
             measurementId: "G-XX93ZSFYK2"
         };
 
-        // *** BURAYA DİKKAT ***
-        // Sadece buraya yazdığın e-postalar ekleme, silme ve düzenleme yapabilir.
-        // Buraya yazılmayan herkes "PERSONEL" sayılır ve SADECE GÖRME yetkisi olur.
+        // *** YÖNETİCİ EMAİLLERİ ***
         const ADMIN_EMAILS = [
             "admin@demo.com", 
             "yonetici@sirket.com",
-            "oguzhanarslan4607@gmail.com" // Kendi mailini buraya ekle
+            "oguzhanarslan4607@gmail.com"
         ]; 
         // =================================================================
 
@@ -80,7 +93,6 @@
         const DB_COLLECTION = "pesinatlar";
 
         const { useState, useEffect, useRef, useMemo } = React;
-        const { jsPDF } = window.jspdf;
         
         // --- İKONLAR ---
         const ICON_PATHS = {
@@ -157,25 +169,38 @@
 
         function MainApp() {
             const [user, setUser] = useState(null);
-            const [isAdmin, setIsAdmin] = useState(false); // Admin yetkisi
+            const [isAdmin, setIsAdmin] = useState(false);
             const [loginEmail, setLoginEmail] = useState('');
             const [loginPass, setLoginPass] = useState('');
             const [loginError, setLoginError] = useState('');
 
             const [entries, setEntries] = useState([]);
             const [isLoading, setIsLoading] = useState(true);
-            const [viewMode, setViewMode] = useState('list'); // 'list', 'dashboard', 'trash'
+            const [viewMode, setViewMode] = useState('list');
             const [searchTerm, setSearchTerm] = useState('');
             const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
             const [editingItem, setEditingItem] = useState(null);
-            const [deleteConfirmId, setDeleteConfirmId] = useState(null); // ID for soft delete confirmation
-            const [permanentDeleteId, setPermanentDeleteId] = useState(null); // ID for hard delete
+            const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+            const [permanentDeleteId, setPermanentDeleteId] = useState(null);
             const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
             
-            // --- KARANLIK MOD ---
-            const [darkMode, setDarkMode] = useState(() => {
-                return localStorage.getItem('theme') === 'dark';
-            });
+            // --- TEMA AYARLARI ---
+            const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
+            const [themeColor, setThemeColor] = useState(() => localStorage.getItem('color') || 'blue');
+
+            // Renk haritası (Hex kodları ile kesin çözüm)
+            const themeHex = {
+                blue: '#3b82f6', // blue-500
+                emerald: '#10b981', // emerald-500
+                violet: '#8b5cf6', // violet-500
+                amber: '#f59e0b' // amber-500
+            };
+            const darkThemeHex = {
+                blue: '#2563eb', // blue-600
+                emerald: '#059669', // emerald-600
+                violet: '#7c3aed', // violet-600
+                amber: '#d97706' // amber-600
+            };
 
             useEffect(() => {
                 if (darkMode) {
@@ -186,6 +211,10 @@
                     localStorage.setItem('theme', 'light');
                 }
             }, [darkMode]);
+
+            useEffect(() => {
+                localStorage.setItem('color', themeColor);
+            }, [themeColor]);
 
             const [formData, setFormData] = useState({
                 receiptNo: '000001',
@@ -202,23 +231,21 @@
 
             const formatCurrency = (val) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
 
-            // --- AUTH DİNLEYİCİSİ ---
+            // --- AUTH ---
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
                     setUser(currentUser);
                     if (currentUser) {
                         setLoginError('');
-                        // Admin kontrolü
                         setIsAdmin(ADMIN_EMAILS.includes(currentUser.email));
                     }
                 });
                 return () => unsubscribe();
             }, []);
 
-            // --- VERİ DİNLEYİCİSİ ---
+            // --- VERİ ---
             useEffect(() => {
                 if (!user) return;
-
                 const q = query(collection(db, DB_COLLECTION));
                 const unsubscribe = onSnapshot(q, (snapshot) => {
                     const loadedData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -236,11 +263,10 @@
                 return () => unsubscribe();
             }, [user]);
 
-            // --- MAKBUZ NO OTOMATİK ---
+            // --- MAKBUZ ---
             useEffect(() => {
                 if (!formData.staffName && !formData.amount && !formData.customerName) {
                     let maxReceiptNo = 0;
-                    // Silinmemiş kayıtlar arasından en büyüğü bul
                     const activeEntries = entries.filter(e => !e.isDeleted);
                     if (activeEntries.length > 0) {
                         activeEntries.forEach(entry => {
@@ -297,10 +323,9 @@
                         history: [],
                         createdAt: new Date().toISOString(),
                         createdBy: user.email,
-                        isDeleted: false // Varsayılan olarak silinmemiş
+                        isDeleted: false
                     };
                     await addDoc(collection(db, DB_COLLECTION), newEntry);
-                    
                     const currentNo = parseInt(formData.receiptNo || "0", 10);
                     const nextNo = (currentNo + 1).toString().padStart(6, '0');
                     setFormData({ receiptNo: nextNo, date: formData.date, staffName: '', office: '', customerName: '', amount: '', image: null });
@@ -310,30 +335,21 @@
                 }
             };
 
-            // --- SOFT DELETE (Çöp Kutusuna Taşı) ---
             const confirmSoftDelete = async () => {
                 try {
                     const historyEntry = { updatedAt: new Date().toISOString(), action: 'Çöp Kutusuna Taşındı', user: user.email };
-                    await updateDoc(doc(db, DB_COLLECTION, deleteConfirmId), { 
-                        isDeleted: true,
-                        history: [...(entries.find(e => e.id === deleteConfirmId)?.history || []), historyEntry]
-                    });
+                    await updateDoc(doc(db, DB_COLLECTION, deleteConfirmId), { isDeleted: true, history: [...(entries.find(e => e.id === deleteConfirmId)?.history || []), historyEntry] });
                     setDeleteConfirmId(null);
                 } catch (error) { alert("Silinemedi: " + error.message); }
             };
 
-            // --- RESTORE (Geri Yükle) ---
             const handleRestore = async (id) => {
                 try {
                     const historyEntry = { updatedAt: new Date().toISOString(), action: 'Çöp Kutusundan Geri Yüklendi', user: user.email };
-                    await updateDoc(doc(db, DB_COLLECTION, id), { 
-                        isDeleted: false,
-                        history: [...(entries.find(e => e.id === id)?.history || []), historyEntry]
-                    });
+                    await updateDoc(doc(db, DB_COLLECTION, id), { isDeleted: false, history: [...(entries.find(e => e.id === id)?.history || []), historyEntry] });
                 } catch (error) { alert("Geri yüklenemedi: " + error.message); }
             };
 
-            // --- PERMANENT DELETE (Kalıcı Silme) ---
             const confirmPermanentDelete = async () => {
                 try {
                     await deleteDoc(doc(db, DB_COLLECTION, permanentDeleteId));
@@ -360,11 +376,7 @@
                     const actionText = changes.length > 0 ? changes.join(', ') : 'Düzenleme yapıldı';
                     const historyEntry = { updatedAt: new Date().toISOString(), action: actionText, user: user.email };
                     
-                    const updateData = {
-                        ...editingItem,
-                        amount: parseFloat(editingItem.amount),
-                        history: [...(editingItem.history || []), historyEntry]
-                    };
+                    const updateData = { ...editingItem, amount: parseFloat(editingItem.amount), history: [...(editingItem.history || []), historyEntry] };
                     delete updateData.original;
 
                     await updateDoc(doc(db, DB_COLLECTION, editingItem.id), updateData);
@@ -373,7 +385,7 @@
             };
 
             const toggleStatus = async (entry) => { 
-                if (!isAdmin) return; // Personel yetkisi yok
+                if (!isAdmin) return;
                 try {
                     const newStatus = entry.status === 'Teslim Edildi' ? 'Teslim Edilmedi' : 'Teslim Edildi'; 
                     const historyEntry = { updatedAt: new Date().toISOString(), action: 'Durum Değişti: ' + newStatus, user: user.email };
@@ -382,11 +394,15 @@
             };
 
             const generatePDF = (entry) => {
+                if (!window.jspdf) {
+                    alert("PDF oluşturucu henüz yüklenmedi, lütfen sayfayı yenileyip tekrar deneyin.");
+                    return;
+                }
+                const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a5" });
                 const trToEn = (str) => { if(!str) return ""; return str.toString().replace(/Ğ/g, "G").replace(/ğ/g, "g").replace(/Ü/g, "U").replace(/ü/g, "u").replace(/Ş/g, "S").replace(/ş/g, "s").replace(/İ/g, "I").replace(/ı/g, "i").replace(/Ö/g, "O").replace(/ö/g, "o").replace(/Ç/g, "C").replace(/ç/g, "c"); };
                 const title = "TAHSILAT MAKBUZU";
                 const dateStr = new Date(entry.date).toLocaleDateString('tr-TR');
-                
                 doc.setLineWidth(0.5); doc.rect(10, 10, 190, 128);
                 doc.setFontSize(22); doc.setTextColor(26, 86, 219); doc.text(title, 105, 25, null, null, "center");
                 doc.setFontSize(10); doc.setTextColor(0, 0, 0); doc.text(`Tarih: ${dateStr}`, 190, 20, null, null, "right"); doc.text(`Makbuz No: #${entry.receiptNo}`, 190, 25, null, null, "right");
@@ -413,43 +429,32 @@
             const downloadBackup = () => { 
                 if (entries.length === 0) return alert("Veri yok."); 
                 let csv = "\uFEFFMakbuz No;Tarih;Personel;Ofis;Müşteri;Tutar;Durum\n"; 
-                // Sadece silinmemişleri yedekle
                 entries.filter(e => !e.isDeleted).forEach(e => { csv += `"${e.receiptNo || ''}";${e.date};"${e.staffName}";"${e.office}";"${e.customerName}";${e.amount.toString().replace('.', ',')};"${e.status || ''}"\n`; }); 
                 const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })); 
                 link.download = `pesinat_yedek_${new Date().toISOString().slice(0,10)}.csv`; link.click(); 
             };
 
-            // --- FİLTRELEME ---
-            // Ana liste için: Silinmemiş olanlar
             const filteredEntries = entries.filter(e => !e.isDeleted).filter(e => {
                 const term = searchTerm.toLowerCase(); const status = (e.status || '').toLowerCase(); const receipt = (e.receiptNo || '').toLowerCase();
                 let matchesDate = true; if (dateFilter.start) matchesDate = matchesDate && e.date >= dateFilter.start; if (dateFilter.end) matchesDate = matchesDate && e.date <= dateFilter.end;
                 return (receipt.includes(term) || e.staffName.toLowerCase().includes(term) || e.customerName.toLowerCase().includes(term) || (e.office || '').toLowerCase().includes(term) || status.includes(term)) && matchesDate;
             });
 
-            // Çöp kutusu için: Silinmiş olanlar
             const trashEntries = entries.filter(e => e.isDeleted);
-
             const totalAmount = filteredEntries.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
             
             const stats = useMemo(() => {
-                // İstatistikler sadece aktif (silinmemiş) kayıtlar üzerinden hesaplanır
                 const activeEntries = entries.filter(e => !e.isDeleted);
                 const totalRevenue = activeEntries.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
                 const currentMonth = new Date().toISOString().slice(0, 7);
                 const monthlyRevenue = activeEntries.filter(e => e.date.startsWith(currentMonth)).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-                
-                // Bugünün Cirosu
                 const todayStr = new Date().toISOString().split('T')[0];
                 const dailyRevenue = activeEntries.filter(e => e.date === todayStr).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-
-                // Teslimat Durumu
                 const deliveredCount = activeEntries.filter(e => e.status === 'Teslim Edildi').length;
                 const pendingCount = activeEntries.filter(e => e.status === 'Teslim Edilmedi').length;
                 const totalCount = activeEntries.length || 1;
                 const deliveryRate = Math.round((deliveredCount / totalCount) * 100);
 
-                // Son 7 Gün Hareketi
                 const last7Days = [];
                 for (let i = 6; i >= 0; i--) {
                     const d = new Date();
@@ -466,39 +471,34 @@
                 return { totalRevenue, monthlyRevenue, dailyRevenue, deliveryStats: { deliveredCount, pendingCount, deliveryRate }, last7Days, maxDayAmount, officeStats, sortedStaff };
             }, [entries]);
 
-            // --- GİRİŞ EKRANI ---
             if (!user) {
                 return (
-                    <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4 transition-colors duration-300">
-                        <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200 dark:border-slate-700">
-                            <div className="flex justify-center mb-6"><div className="bg-blue-100 dark:bg-blue-900 p-4 rounded-full"><Icons.Cloud className="w-8 h-8 text-blue-600 dark:text-blue-300" /></div></div>
+                    <div className={`min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4 transition-colors duration-300`}>
+                        <div className={`bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200 dark:border-slate-700`}>
+                            <div className="flex justify-center mb-6"><div className={`bg-${themeColor}-100 dark:bg-${themeColor}-900 p-4 rounded-full`}><Icons.Cloud className={`w-8 h-8 text-${themeColor}-600 dark:text-${themeColor}-300`} /></div></div>
                             <h2 className="text-2xl font-bold text-center text-slate-800 dark:text-slate-100 mb-2">Güvenli Giriş</h2>
                             <p className="text-center text-slate-500 dark:text-slate-400 mb-6 text-sm">Firebase Hesabınızla Giriş Yapın</p>
                             <form onSubmit={handleLogin} className="space-y-4">
                                 <div><label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">E-Posta</label><div className="relative"><div className="absolute left-3 top-3 w-4 h-4 text-slate-400"><Icons.User className="w-4 h-4" /></div><input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:bg-slate-700 dark:text-white" placeholder="ornek@sirket.com" autoFocus required /></div></div>
                                 <div><label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Şifre</label><div className="relative"><div className="absolute left-3 top-3 w-4 h-4 text-slate-400"><Icons.Ticket className="w-4 h-4" /></div><input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:bg-slate-700 dark:text-white" placeholder="••••••••" required /></div></div>
                                 {loginError && (<div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 p-3 rounded-lg text-sm flex items-center gap-2 animate-pulse"><Icons.AlertCircle className="w-4 h-4" />{loginError}</div>)}
-                                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2"><Icons.LogIn className="w-4 h-4" /> Giriş Yap</button>
+                                <button type="submit" className={`w-full bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white py-3 rounded-lg font-bold shadow-lg shadow-${themeColor}-200 transition-all flex items-center justify-center gap-2`}><Icons.LogIn className="w-4 h-4" /> Giriş Yap</button>
                             </form>
                         </div>
                     </div>
                 );
             }
 
-            // --- ANA EKRAN ---
             return (
                 <div className={`min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-4 md:p-8 relative transition-colors duration-300`}>
-                    {/* MODALLAR */}
                     {deleteConfirmId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full"><h3 className="text-lg font-bold text-slate-900 dark:text-white text-center">Çöp Kutusuna Taşı?</h3><p className="text-slate-500 dark:text-slate-400 mt-1 text-sm text-center">Bu kaydı daha sonra geri yükleyebilirsiniz.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setDeleteConfirmId(null)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-200">İptal</button><button onClick={confirmSoftDelete} className="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700">Sil</button></div></div></div>)}
-                    
                     {permanentDeleteId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full border-2 border-red-500"><h3 className="text-lg font-bold text-red-600 text-center">DİKKAT: KALICI SİLME!</h3><p className="text-slate-500 dark:text-slate-400 mt-1 text-sm text-center">Bu işlem geri alınamaz. Kayıt tamamen yok olacak.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setPermanentDeleteId(null)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-200">Vazgeç</button><button onClick={confirmPermanentDelete} className="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-bold">KALICI SİL</button></div></div></div>)}
-
                     {imagePreviewUrl && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setImagePreviewUrl(null)}><div className="bg-white dark:bg-slate-800 p-2 rounded-lg max-w-3xl max-h-[90vh] overflow-auto"><img src={imagePreviewUrl} alt="Dekont" className="max-w-full h-auto rounded" /><div className="text-center mt-2 text-sm text-slate-500 dark:text-slate-400">Kapatmak için dışarı tıklayın</div></div></div>)}
                     
                     {editingItem && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
                             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl my-8 border dark:border-slate-700">
-                                <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-700"><h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2"><Icons.Pencil className="w-5 h-5 text-blue-600" /> Kaydı Düzenle</h3><button onClick={() => setEditingItem(null)}><Icons.X className="w-6 h-6 text-slate-400" /></button></div>
+                                <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-700"><h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2"><Icons.Pencil className={`w-5 h-5 text-${themeColor}-600`} /> Kaydı Düzenle</h3><button onClick={() => setEditingItem(null)}><Icons.X className="w-6 h-6 text-slate-400" /></button></div>
                                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2"><label className="text-sm font-semibold">Makbuz No</label><input type="text" value={editingItem.receiptNo} disabled className="w-full p-2.5 border dark:border-slate-600 rounded-lg font-mono bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400" /></div>
                                     <div className="space-y-2"><label className="text-sm font-semibold">Tarih</label><input type="date" value={editingItem.date} onChange={(e) => setEditingItem(p => ({...p, date: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900" /></div>
@@ -521,27 +521,32 @@
                                         ) : <div className="text-xs text-slate-400 italic p-2">Henüz geçmiş işlem kaydı yok.</div>}
                                     </div>
                                 </div>
-                                <div className="p-6 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800 rounded-b-xl"><button onClick={() => setEditingItem(null)} className="px-5 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg font-medium">İptal</button><button onClick={saveEdit} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2"><Icons.Save className="w-4 h-4" /> Kaydet</button></div>
+                                <div className="p-6 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800 rounded-b-xl"><button onClick={() => setEditingItem(null)} className="px-5 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg font-medium">İptal</button><button onClick={saveEdit} className={`px-6 py-2.5 bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white rounded-lg font-medium flex items-center gap-2`}><Icons.Save className="w-4 h-4" /> Kaydet</button></div>
                             </div>
                         </div>
                     )}
 
-                    {/* HEADER */}
                     <div className="max-w-6xl mx-auto space-y-6">
                         <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row items-center justify-between gap-4">
                             <div>
-                                <h1 className="text-2xl font-bold text-blue-900 dark:text-blue-400 flex items-center gap-2"><Icons.Cloud className="w-8 h-8 text-blue-600 dark:text-blue-400" /> Peşinat Tablosu</h1>
+                                <h1 className={`text-2xl font-bold text-${themeColor}-900 dark:text-${themeColor}-400 flex items-center gap-2`}><Icons.Cloud className={`w-8 h-8 text-${themeColor}-600 dark:text-${themeColor}-400`} /> Peşinat Tablosu</h1>
                                 <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 flex items-center gap-1">
                                     <Icons.User className={`w-3 h-3 ${isAdmin ? 'text-red-500' : 'text-green-500'}`} /> 
                                     {user.email} <span className="text-xs bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded ml-2">{isAdmin ? 'Yönetici' : 'Personel'}</span>
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-2 bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
-                                <button onClick={() => setViewMode('list')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'list' ? 'bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-300' : 'text-slate-500 dark:text-slate-300 hover:text-slate-700'}`}><Icons.List className="w-4 h-4" /> Liste</button>
-                                <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'dashboard' ? 'bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-300' : 'text-slate-500 dark:text-slate-300 hover:text-slate-700'}`}><Icons.LayoutDashboard className="w-4 h-4" /> İstatistikler</button>
-                                {isAdmin && (
-                                    <button onClick={() => setViewMode('trash')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'trash' ? 'bg-red-100 dark:bg-red-900 shadow text-red-600 dark:text-red-300' : 'text-slate-500 dark:text-slate-300 hover:text-red-500'}`}><Icons.Trash2 className="w-4 h-4" /> Çöp Kutusu</button>
-                                )}
+                                <button onClick={() => setViewMode('list')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'list' ? `bg-white dark:bg-slate-600 shadow text-${themeColor}-600 dark:text-${themeColor}-300` : 'text-slate-500 dark:text-slate-300 hover:text-slate-700'}`}><Icons.List className="w-4 h-4" /> Liste</button>
+                                <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'dashboard' ? `bg-white dark:bg-slate-600 shadow text-${themeColor}-600 dark:text-${themeColor}-300` : 'text-slate-500 dark:text-slate-300 hover:text-slate-700'}`}><Icons.LayoutDashboard className="w-4 h-4" /> İstatistikler</button>
+                                {isAdmin && (<button onClick={() => setViewMode('trash')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'trash' ? 'bg-red-100 dark:bg-red-900 shadow text-red-600 dark:text-red-300' : 'text-slate-500 dark:text-slate-300 hover:text-red-500'}`}><Icons.Trash2 className="w-4 h-4" /> Çöp Kutusu</button>)}
+                                <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                                
+                                <div className="flex items-center gap-1 mr-1">
+                                    {['blue', 'emerald', 'violet', 'amber'].map(color => (
+                                        <button key={color} onClick={() => setThemeColor(color)} className={`w-5 h-5 rounded-full bg-${color}-500 hover:scale-110 transition-transform ring-1 ring-offset-1 ${themeColor === color ? 'ring-slate-400 scale-110' : 'ring-transparent'}`} title={color.charAt(0).toUpperCase() + color.slice(1)}></button>
+                                    ))}
+                                </div>
+
                                 <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1"></div>
                                 <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-md text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-600" title={darkMode ? "Aydınlık Mod" : "Karanlık Mod"}>{darkMode ? <Icons.Sun className="w-4 h-4" /> : <Icons.Moon className="w-4 h-4" />}</button>
                                 <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1"></div>
@@ -549,14 +554,11 @@
                             </div>
                         </div>
 
-                        {/* DASHBOARD */}
                         {viewMode === 'dashboard' && (
                             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                
-                                {/* 1. SATIR: KARTLAR */}
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg shadow-blue-200 dark:shadow-none">
-                                        <div className="text-blue-100 text-sm font-medium mb-1">Toplam Ciro</div>
+                                    <div className={`bg-gradient-to-br from-${themeColor}-500 to-${themeColor}-600 rounded-xl p-6 text-white shadow-lg shadow-${themeColor}-200 dark:shadow-none`}>
+                                        <div className={`text-${themeColor}-100 text-sm font-medium mb-1`}>Toplam Ciro</div>
                                         <div className="text-3xl font-bold">{formatCurrency(stats.totalRevenue)}</div>
                                     </div>
                                     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
@@ -569,33 +571,34 @@
                                     </div>
                                 </div>
 
-                                {/* 2. SATIR: GRAFİKLER */}
                                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                    {/* SON 7 GÜN GRAFİĞİ */}
                                     <div className="lg:col-span-2 bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                                        <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-6 flex items-center gap-2"><Icons.TrendingUp className="w-5 h-5 text-blue-500" /> Son 7 Günün Hareketi</h3>
+                                        <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-6 flex items-center gap-2"><Icons.TrendingUp className={`w-5 h-5 text-${themeColor}-500`} /> Son 7 Günün Hareketi</h3>
                                         <div className="h-48 flex items-end justify-between gap-2">
                                             {stats.last7Days.map((day, i) => {
-                                                const heightPercent = (day.amount / stats.maxDayAmount) * 100;
+                                                const heightPercent = Math.max((day.amount / stats.maxDayAmount) * 100, 2);
                                                 return (
-                                                    <div key={i} className="flex-1 flex flex-col items-center group">
-                                                        <div className="relative w-full flex justify-center">
-                                                            <div className="absolute bottom-full mb-2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">{formatCurrency(day.amount)}</div>
-                                                            <div style={{'--h': `${heightPercent}%`}} className="w-full max-w-[40px] bg-blue-100 dark:bg-blue-900/50 rounded-t-lg bar-animate relative overflow-hidden">
-                                                                <div className="absolute bottom-0 left-0 right-0 bg-blue-500 dark:bg-blue-600 top-0 opacity-80 group-hover:opacity-100 transition-opacity"></div>
+                                                    <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group">
+                                                        <div className="relative w-full flex justify-center h-full items-end">
+                                                            <div 
+                                                                style={{ 
+                                                                    height: `${heightPercent}%`,
+                                                                    backgroundColor: darkMode ? darkThemeHex[themeColor] : themeHex[themeColor]
+                                                                }} 
+                                                                className="w-full max-w-[30px] rounded-t-lg transition-all duration-1000 relative opacity-80 group-hover:opacity-100"
+                                                            >
+                                                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">{formatCurrency(day.amount)}</div>
                                                             </div>
                                                         </div>
-                                                        <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-medium">{day.date}</div>
+                                                        <div className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-medium whitespace-nowrap">{day.date}</div>
                                                     </div>
                                                 )
                                             })}
                                         </div>
                                     </div>
 
-                                    {/* TESLİMAT DURUMU */}
                                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-center">
                                         <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-6 flex items-center gap-2"><Icons.Package className="w-5 h-5 text-orange-500" /> Teslimat Durumu</h3>
-                                        
                                         <div className="relative w-40 h-40 mx-auto mb-4">
                                             <svg className="w-full h-full" viewBox="0 0 36 36">
                                                 <path className="text-slate-100 dark:text-slate-700" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="currentColor" strokeWidth="3.8" />
@@ -606,36 +609,27 @@
                                                 <span className="text-xs text-slate-500 dark:text-slate-400">Teslim Edildi</span>
                                             </div>
                                         </div>
-
                                         <div className="flex justify-between text-sm mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
-                                            <div className="text-center">
-                                                <div className="text-xs text-slate-500 dark:text-slate-400">Bekleyen</div>
-                                                <div className="font-bold text-orange-600 dark:text-orange-400 text-lg">{stats.deliveryStats.pendingCount}</div>
-                                            </div>
+                                            <div className="text-center"><div className="text-xs text-slate-500 dark:text-slate-400">Bekleyen</div><div className="font-bold text-orange-600 dark:text-orange-400 text-lg">{stats.deliveryStats.pendingCount}</div></div>
                                             <div className="w-px bg-slate-200 dark:bg-slate-700"></div>
-                                            <div className="text-center">
-                                                <div className="text-xs text-slate-500 dark:text-slate-400">Tamamlanan</div>
-                                                <div className="font-bold text-green-600 dark:text-green-400 text-lg">{stats.deliveryStats.deliveredCount}</div>
-                                            </div>
+                                            <div className="text-center"><div className="text-xs text-slate-500 dark:text-slate-400">Tamamlanan</div><div className="font-bold text-green-600 dark:text-green-400 text-lg">{stats.deliveryStats.deliveredCount}</div></div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* 3. SATIR: OFİS & PERSONEL */}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                                         <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2"><Icons.Building2 className="w-5 h-5 text-slate-400" /> Ofis Performansı</h3>
-                                        <div className="space-y-3">{Object.entries(stats.officeStats).map(([office, amount]) => (<div key={office}><div className="flex justify-between text-sm mb-1"><span className="font-medium text-slate-700 dark:text-slate-300">{office}</span><span className="text-slate-500 dark:text-slate-400">{formatCurrency(amount)}</span></div><div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5"><div className="bg-blue-500 h-2.5 rounded-full" style={{ width: `${(amount / stats.totalRevenue) * 100}%` }}></div></div></div>))}</div>
+                                        <div className="space-y-3">{Object.entries(stats.officeStats).map(([office, amount]) => (<div key={office}><div className="flex justify-between text-sm mb-1"><span className="font-medium text-slate-700 dark:text-slate-300">{office}</span><span className="text-slate-500 dark:text-slate-400">{formatCurrency(amount)}</span></div><div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5"><div className={`bg-${themeColor}-500 h-2.5 rounded-full`} style={{ width: `${(amount / stats.totalRevenue) * 100}%` }}></div></div></div>))}</div>
                                     </div>
                                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                                         <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2"><Icons.User className="w-5 h-5 text-slate-400" /> En İyi 5 Personel</h3>
-                                        <div className="space-y-4">{stats.sortedStaff.map(([name, amount], index) => (<div key={name} className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>{index + 1}</div><div className="flex-1"><div className="text-sm font-medium text-slate-800 dark:text-slate-200">{name}</div><div className="text-xs text-slate-500 dark:text-slate-400">{formatCurrency(amount)}</div></div><div className="text-blue-600 dark:text-blue-400 font-bold text-sm">%{Math.round((amount / stats.totalRevenue) * 100)}</div></div>))}</div>
+                                        <div className="space-y-4">{stats.sortedStaff.map(([name, amount], index) => (<div key={name} className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>{index + 1}</div><div className="flex-1"><div className="text-sm font-medium text-slate-800 dark:text-slate-200">{name}</div><div className="text-xs text-slate-500 dark:text-slate-400">{formatCurrency(amount)}</div></div><div className={`text-${themeColor}-600 dark:text-${themeColor}-400 font-bold text-sm`}>%{Math.round((amount / stats.totalRevenue) * 100)}</div></div>))}</div>
                                     </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* ÇÖP KUTUSU (SADECE ADMIN) */}
                         {viewMode === 'trash' && isAdmin && (
                             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden animate-in fade-in">
                                 <div className="p-4 bg-red-50 dark:bg-red-900/20 border-b border-red-100 dark:border-red-900/30 flex justify-between items-center">
@@ -654,7 +648,6 @@
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                                                 {trashEntries.map(entry => {
-                                                    // Silme işlemini kimin yaptığını geçmişten bul
                                                     const deletedBy = entry.history?.find(h => h.action === 'Çöp Kutusuna Taşındı')?.user || 'Bilinmiyor';
                                                     return (
                                                         <tr key={entry.id} className="hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
@@ -678,7 +671,6 @@
                             </div>
                         )}
 
-                        {/* LISTE */}
                         {viewMode === 'list' && (
                             <>
                                 {isAdmin && (
@@ -692,7 +684,7 @@
                                         <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Müşteri</label><input type="text" name="customerName" placeholder="Örn: Ayşe" value={formData.customerName} onChange={(e) => setFormData(p => ({...p, customerName: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" required /></div>
                                         <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tutar (TL)</label><input type="number" name="amount" placeholder="0.00" value={formData.amount} onChange={(e) => setFormData(p => ({...p, amount: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-green-500 font-mono dark:bg-slate-900" required /></div>
                                         <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1"><Icons.Paperclip className="w-3 h-3" /> Dekont</label><input type="file" ref={fileInputRef} accept="image/*" onChange={(e) => handleImageUpload(e.target.files[0], (base64) => setFormData(p => ({...p, image: base64})))} className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-50 dark:bg-slate-700 file:text-blue-700 dark:text-blue-300"/></div>
-                                        <div className="lg:col-span-7 flex justify-end mt-2"><button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium shadow-sm w-full md:w-auto flex justify-center items-center gap-2"><Icons.PlusCircle className="w-4 h-4" /> Listeye Ekle</button></div>
+                                        <div className="lg:col-span-7 flex justify-end mt-2"><button type="submit" className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-6 py-2 rounded-lg font-medium shadow-sm w-full md:w-auto flex justify-center items-center gap-2`}><Icons.PlusCircle className="w-4 h-4" /> Listeye Ekle</button></div>
                                     </form>
                                 </div>
                                 )}
@@ -725,13 +717,13 @@
                                                 {filteredEntries.map((entry) => {
                                                     const isDelivered = entry.status === 'Teslim Edildi';
                                                     return (
-                                                        <tr key={entry.id} className="hover:bg-blue-50 dark:hover:bg-slate-700/50 transition-colors group">
-                                                            <td className="p-4 font-mono font-bold text-blue-900 dark:text-blue-300">{entry.receiptNo || '-'}</td>
+                                                        <tr key={entry.id} className={`hover:bg-${themeColor}-50 dark:hover:bg-${themeColor}-900/10 transition-colors group`}>
+                                                            <td className={`p-4 font-mono font-bold text-${themeColor}-900 dark:text-${themeColor}-300`}>{entry.receiptNo || '-'}</td>
                                                             <td className="p-4 text-slate-600 dark:text-slate-400 text-sm">{new Date(entry.date).toLocaleDateString('tr-TR')}</td>
                                                             <td className="p-4 text-slate-800 dark:text-slate-200 font-medium">{entry.staffName}</td>
                                                             <td className="p-4 text-slate-600 dark:text-slate-400 text-sm">{entry.office}</td>
                                                             <td className="p-4 text-slate-800 dark:text-slate-200">{entry.customerName}</td>
-                                                            <td className="p-4 text-center">{entry.image && (<button onClick={() => setImagePreviewUrl(entry.image)} className="text-slate-400 hover:text-blue-600 transition-colors" title="Dekontu Gör"><Icons.ImageIcon className="w-5 h-5" /></button>)}</td>
+                                                            <td className="p-4 text-center">{entry.image && (<button onClick={() => setImagePreviewUrl(entry.image)} className={`text-slate-400 hover:text-${themeColor}-600 transition-colors`} title="Dekontu Gör"><Icons.ImageIcon className="w-5 h-5" /></button>)}</td>
                                                             <td className="p-4 text-center"><button onClick={() => toggleStatus(entry)} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold border ${isDelivered ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-200' : 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100'} ${!isAdmin ? 'cursor-not-allowed opacity-70' : ''}`} disabled={!isAdmin}>{isDelivered ? <Icons.CheckCircle2 className="w-3 h-3" /> : <Icons.Clock className="w-3 h-3" />} {entry.status || 'Bekliyor'}</button></td>
                                                             <td className="p-4 text-right font-mono font-medium text-slate-700 dark:text-slate-300">{formatCurrency(entry.amount)}</td>
                                                             <td className="p-4 text-center">
@@ -740,7 +732,7 @@
                                                                     <button onClick={() => generatePDF(entry)} className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20" title="PDF Olarak İndir"><Icons.FileText className="w-4 h-4" /></button>
                                                                     {isAdmin && (
                                                                         <>
-                                                                            <button onClick={() => setEditingItem({...entry, original: {...entry}})} className="text-blue-400 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 p-1.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/20" title="Düzenle"><Icons.Pencil className="w-4 h-4" /></button>
+                                                                            <button onClick={() => setEditingItem({...entry, original: {...entry}})} className={`text-${themeColor}-400 hover:text-${themeColor}-600 dark:text-${themeColor}-400 dark:hover:text-${themeColor}-300 p-1.5 rounded hover:bg-${themeColor}-100 dark:hover:bg-${themeColor}-900/20`} title="Düzenle"><Icons.Pencil className="w-4 h-4" /></button>
                                                                             <button onClick={() => setDeleteConfirmId(entry.id)} className="text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20" title="Çöp Kutusuna Taşı"><Icons.Trash2 className="w-4 h-4" /></button>
                                                                         </>
                                                                     )}
