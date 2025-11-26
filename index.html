@@ -36,8 +36,11 @@
     <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- jsPDF -->
+    <!-- jsPDF (PDF için) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <!-- SheetJS (Excel için) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -426,12 +429,26 @@
                 printWindow.document.write(htmlContent); printWindow.document.close();
             };
 
-            const downloadBackup = () => { 
-                if (entries.length === 0) return alert("Veri yok."); 
-                let csv = "\uFEFFMakbuz No;Tarih;Personel;Ofis;Müşteri;Tutar;Durum\n"; 
-                entries.filter(e => !e.isDeleted).forEach(e => { csv += `"${e.receiptNo || ''}";${e.date};"${e.staffName}";"${e.office}";"${e.customerName}";${e.amount.toString().replace('.', ',')};"${e.status || ''}"\n`; }); 
-                const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })); 
-                link.download = `pesinat_yedek_${new Date().toISOString().slice(0,10)}.csv`; link.click(); 
+            const exportToExcel = () => {
+                if (entries.length === 0) return alert("Dışa aktarılacak veri yok.");
+                if (!window.XLSX) { return alert("Excel kütüphanesi yükleniyor, lütfen bekleyin..."); }
+                
+                const dataToExport = entries.filter(e => !e.isDeleted).map(entry => ({
+                    "Makbuz No": entry.receiptNo,
+                    "Tarih": new Date(entry.date).toLocaleDateString('tr-TR'),
+                    "Personel": entry.staffName,
+                    "Ofis": entry.office,
+                    "Müşteri": entry.customerName,
+                    "Tutar": entry.amount,
+                    "Durum": entry.status,
+                    "Oluşturulma": new Date(entry.createdAt).toLocaleString('tr-TR'),
+                    "Oluşturan": entry.createdBy
+                }));
+
+                const ws = XLSX.utils.json_to_sheet(dataToExport);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Pesinatlar");
+                XLSX.writeFile(wb, `Pesinat_Listesi_${new Date().toISOString().slice(0,10)}.xlsx`);
             };
 
             const filteredEntries = entries.filter(e => !e.isDeleted).filter(e => {
@@ -698,6 +715,7 @@
                                             <div className="flex items-center gap-1"><span className="text-xs text-slate-400 font-medium">Bitiş:</span><input type="date" value={dateFilter.end} onChange={e => setDateFilter(prev => ({...prev, end: e.target.value}))} className="text-sm border-none outline-none text-slate-600 dark:text-slate-300 bg-transparent" /></div>
                                             {(dateFilter.start || dateFilter.end) && (<button onClick={() => setDateFilter({start:'', end:''})} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-400"><Icons.X className="w-3 h-3" /></button>)}
                                         </div>
+                                        <button onClick={exportToExcel} className="px-3 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-white hover:shadow transition-all flex items-center gap-1" title="Excel Olarak İndir"><Icons.Download className="w-4 h-4" /> Excel</button>
                                     </div>
 
                                     {isLoading ? (
