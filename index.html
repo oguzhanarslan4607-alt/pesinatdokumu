@@ -61,9 +61,14 @@
             measurementId: "G-XX93ZSFYK2"
         };
 
-        // YÖNETİCİ EMAİLLERİNİ BURAYA EKLE
-        // Sadece bu listedekiler Çöp Kutusunu görebilir ve Kalıcı Silme yapabilir.
-        const ADMIN_EMAILS = ["oguzhanarslan4607@gmail.com"]; 
+        // *** BURAYA DİKKAT ***
+        // Sadece buraya yazdığın e-postalar ekleme, silme ve düzenleme yapabilir.
+        // Buraya yazılmayan herkes "PERSONEL" sayılır ve SADECE GÖRME yetkisi olur.
+        const ADMIN_EMAILS = [
+            "admin@demo.com", 
+            "yonetici@sirket.com",
+            "oguzhanarslan4607@gmail.com" // Kendi mailini buraya ekle
+        ]; 
         // =================================================================
 
         const app = initializeApp(firebaseConfig);
@@ -361,6 +366,7 @@
             };
 
             const toggleStatus = async (entry) => { 
+                if (!isAdmin) return; // Personel yetkisi yok
                 try {
                     const newStatus = entry.status === 'Teslim Edildi' ? 'Teslim Edilmedi' : 'Teslim Edildi'; 
                     const historyEntry = { updatedAt: new Date().toISOString(), action: 'Durum Değişti: ' + newStatus, user: user.email };
@@ -580,6 +586,7 @@
                         {/* LISTE */}
                         {viewMode === 'list' && (
                             <>
+                                {isAdmin && (
                                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                                     <h2 className="text-lg font-semibold mb-4 text-slate-700 dark:text-slate-200 flex items-center gap-2"><Icons.PlusCircle className="w-5 h-5" /> Yeni Kayıt Ekle</h2>
                                     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
@@ -593,6 +600,7 @@
                                         <div className="lg:col-span-7 flex justify-end mt-2"><button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium shadow-sm w-full md:w-auto flex justify-center items-center gap-2"><Icons.PlusCircle className="w-4 h-4" /> Listeye Ekle</button></div>
                                     </form>
                                 </div>
+                                )}
 
                                 <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
                                     <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex flex-col md:flex-row items-center justify-between gap-4">
@@ -629,14 +637,18 @@
                                                             <td className="p-4 text-slate-600 dark:text-slate-400 text-sm">{entry.office}</td>
                                                             <td className="p-4 text-slate-800 dark:text-slate-200">{entry.customerName}</td>
                                                             <td className="p-4 text-center">{entry.image && (<button onClick={() => setImagePreviewUrl(entry.image)} className="text-slate-400 hover:text-blue-600 transition-colors" title="Dekontu Gör"><Icons.ImageIcon className="w-5 h-5" /></button>)}</td>
-                                                            <td className="p-4 text-center"><button onClick={() => toggleStatus(entry)} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold border ${isDelivered ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-200' : 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100'}`}>{isDelivered ? <Icons.CheckCircle2 className="w-3 h-3" /> : <Icons.Clock className="w-3 h-3" />} {entry.status || 'Bekliyor'}</button></td>
+                                                            <td className="p-4 text-center"><button onClick={() => toggleStatus(entry)} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold border ${isDelivered ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-200' : 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100'} ${!isAdmin ? 'cursor-not-allowed opacity-70' : ''}`} disabled={!isAdmin}>{isDelivered ? <Icons.CheckCircle2 className="w-3 h-3" /> : <Icons.Clock className="w-3 h-3" />} {entry.status || 'Bekliyor'}</button></td>
                                                             <td className="p-4 text-right font-mono font-medium text-slate-700 dark:text-slate-300">{formatCurrency(entry.amount)}</td>
                                                             <td className="p-4 text-center">
                                                                 <div className="flex items-center justify-center gap-1">
                                                                     <button onClick={() => printReceipt(entry)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="Hızlı Yazdır"><Icons.Printer className="w-4 h-4" /></button>
                                                                     <button onClick={() => generatePDF(entry)} className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20" title="PDF Olarak İndir"><Icons.FileText className="w-4 h-4" /></button>
-                                                                    <button onClick={() => setEditingItem({...entry, original: {...entry}})} className="text-blue-400 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 p-1.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/20" title="Düzenle"><Icons.Pencil className="w-4 h-4" /></button>
-                                                                    <button onClick={() => setDeleteConfirmId(entry.id)} className="text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20" title="Çöp Kutusuna Taşı"><Icons.Trash2 className="w-4 h-4" /></button>
+                                                                    {isAdmin && (
+                                                                        <>
+                                                                            <button onClick={() => setEditingItem({...entry, original: {...entry}})} className="text-blue-400 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 p-1.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/20" title="Düzenle"><Icons.Pencil className="w-4 h-4" /></button>
+                                                                            <button onClick={() => setDeleteConfirmId(entry.id)} className="text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20" title="Çöp Kutusuna Taşı"><Icons.Trash2 className="w-4 h-4" /></button>
+                                                                        </>
+                                                                    )}
                                                                 </div>
                                                             </td>
                                                         </tr>
