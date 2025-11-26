@@ -3,10 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Peşinat Takip Tablosu (GÜVENLİ & PDF)</title>
+    <title>Peşinat Takip Tablosu (PRO)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: { 850: '#151e2e', 950: '#020617' }
+                    }
+                }
+            }
+        }
+    </script>
     
     <!-- React & ReactDOM -->
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -15,9 +27,8 @@
     <!-- Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- jsPDF & Noto Sans Fontu (Türkçe Karakter İçin) -->
+    <!-- jsPDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- jsPDF için özel Türkçe font desteği sağlayan eklenti (vfs_fonts) -->
     <script src="https://rawgit.com/MrRio/jsPDF/master/font_generator/font_generator.js"></script>
 
     <style>
@@ -25,23 +36,21 @@
         body { font-family: 'Inter', sans-serif; }
         @media print { .no-print { display: none !important; } }
         .history-scroll::-webkit-scrollbar { width: 6px; }
-        .history-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
-        .history-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        .history-scroll::-webkit-scrollbar-track { background: transparent; }
+        .history-scroll::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 3px; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800">
+<body>
 
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        // --- FIREBASE IMPORTLARI ---
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-        // Auth Modülü Eklendi
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         // =================================================================
-        // --- SENİN BİLGİLERİN ---
+        // --- AYARLAR ---
         const firebaseConfig = {
             apiKey: "AIzaSyDEGpqDzFjMMJxqey1nG5kWearDmZsSNao",
             authDomain: "pesinatdokumu.firebaseapp.com",
@@ -51,11 +60,15 @@
             appId: "1:619959488442:web:4b787b415d023c2c4c5783",
             measurementId: "G-XX93ZSFYK2"
         };
+
+        // YÖNETİCİ EMAİLLERİNİ BURAYA EKLE
+        // Sadece bu listedekiler Çöp Kutusunu görebilir ve Kalıcı Silme yapabilir.
+        const ADMIN_EMAILS = ["oguzhanarslan4607@gmail.com"]; 
         // =================================================================
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        const auth = getAuth(app); // Auth Başlatıldı
+        const auth = getAuth(app);
         const DB_COLLECTION = "pesinatlar";
 
         const { useState, useEffect, useRef, useMemo } = React;
@@ -86,17 +99,17 @@
             'log-in': <><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></>,
             'wallet': <><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4v-8Z"/></>,
             'history': <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></>,
-            'file-text': <><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>
+            'file-text': <><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
+            'moon': <><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></>,
+            'sun': <><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></>,
+            'rotate-ccw': <><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></>,
+            'ban': <><circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/></>
         };
 
         const Icon = ({ name, size = 20, className, ...props }) => {
             const content = ICON_PATHS[name];
             if (!content) return null;
-            return (
-                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
-                    {content}
-                </svg>
-            );
+            return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>{content}</svg>;
         };
 
         const Icons = {
@@ -123,24 +136,45 @@
             Lock: (p) => <Icon name="lock" {...p} />,
             LogIn: (p) => <Icon name="log-in" {...p} />,
             History: (p) => <Icon name="history" {...p} />,
-            FileText: (p) => <Icon name="file-text" {...p} />
+            FileText: (p) => <Icon name="file-text" {...p} />,
+            Moon: (p) => <Icon name="moon" {...p} />,
+            Sun: (p) => <Icon name="sun" {...p} />,
+            RotateCcw: (p) => <Icon name="rotate-ccw" {...p} />,
+            Ban: (p) => <Icon name="ban" {...p} />
         };
 
         function MainApp() {
-            const [user, setUser] = useState(null); // Firebase User Objesi
+            const [user, setUser] = useState(null);
+            const [isAdmin, setIsAdmin] = useState(false); // Admin yetkisi
             const [loginEmail, setLoginEmail] = useState('');
             const [loginPass, setLoginPass] = useState('');
             const [loginError, setLoginError] = useState('');
 
             const [entries, setEntries] = useState([]);
             const [isLoading, setIsLoading] = useState(true);
-            const [viewMode, setViewMode] = useState('list');
+            const [viewMode, setViewMode] = useState('list'); // 'list', 'dashboard', 'trash'
             const [searchTerm, setSearchTerm] = useState('');
             const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
             const [editingItem, setEditingItem] = useState(null);
-            const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+            const [deleteConfirmId, setDeleteConfirmId] = useState(null); // ID for soft delete confirmation
+            const [permanentDeleteId, setPermanentDeleteId] = useState(null); // ID for hard delete
             const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
             
+            // --- KARANLIK MOD ---
+            const [darkMode, setDarkMode] = useState(() => {
+                return localStorage.getItem('theme') === 'dark';
+            });
+
+            useEffect(() => {
+                if (darkMode) {
+                    document.documentElement.classList.add('dark');
+                    localStorage.setItem('theme', 'dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    localStorage.setItem('theme', 'light');
+                }
+            }, [darkMode]);
+
             const [formData, setFormData] = useState({
                 receiptNo: '000001',
                 date: new Date().toISOString().split('T')[0],
@@ -162,6 +196,8 @@
                     setUser(currentUser);
                     if (currentUser) {
                         setLoginError('');
+                        // Admin kontrolü
+                        setIsAdmin(ADMIN_EMAILS.includes(currentUser.email));
                     }
                 });
                 return () => unsubscribe();
@@ -169,7 +205,7 @@
 
             // --- VERİ DİNLEYİCİSİ ---
             useEffect(() => {
-                if (!user) return; // Kullanıcı yoksa veri çekme
+                if (!user) return;
 
                 const q = query(collection(db, DB_COLLECTION));
                 const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -182,8 +218,7 @@
                     setEntries(loadedData);
                     setIsLoading(false);
                 }, (error) => {
-                    console.error("Veri hatası:", error);
-                    alert("Veri hatası: " + error.message);
+                    console.error(error);
                     setIsLoading(false);
                 });
                 return () => unsubscribe();
@@ -193,8 +228,10 @@
             useEffect(() => {
                 if (!formData.staffName && !formData.amount && !formData.customerName) {
                     let maxReceiptNo = 0;
-                    if (entries.length > 0) {
-                        entries.forEach(entry => {
+                    // Silinmemiş kayıtlar arasından en büyüğü bul
+                    const activeEntries = entries.filter(e => !e.isDeleted);
+                    if (activeEntries.length > 0) {
+                        activeEntries.forEach(entry => {
                             const num = parseInt(entry.receiptNo || "0", 10);
                             if (!isNaN(num) && num > maxReceiptNo) maxReceiptNo = num;
                         });
@@ -204,24 +241,17 @@
                 }
             }, [entries, formData.staffName, formData.amount, formData.customerName]);
 
-            // --- GİRİŞ YAP ---
             const handleLogin = async (e) => {
                 e.preventDefault();
                 setLoginError('');
                 try {
                     await signInWithEmailAndPassword(auth, loginEmail, loginPass);
                 } catch (error) {
-                    let msg = "Giriş başarısız.";
-                    if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') msg = "E-posta veya şifre hatalı.";
-                    else if (error.code === 'auth/user-not-found') msg = "Böyle bir kullanıcı bulunamadı.";
-                    setLoginError(msg);
+                    setLoginError("Giriş başarısız. Bilgileri kontrol edin.");
                 }
             };
 
-            // --- ÇIKIŞ YAP ---
-            const handleLogout = async () => {
-                try { await signOut(auth); } catch(e) { console.error(e); }
-            };
+            const handleLogout = async () => { try { await signOut(auth); } catch(e) { console.error(e); } };
 
             const handleImageUpload = (file, callback) => {
                 if (!file) return;
@@ -254,7 +284,8 @@
                         status: 'Teslim Edilmedi',
                         history: [],
                         createdAt: new Date().toISOString(),
-                        createdBy: user.email // Kaydeden kişiyi tut
+                        createdBy: user.email,
+                        isDeleted: false // Varsayılan olarak silinmemiş
                     };
                     await addDoc(collection(db, DB_COLLECTION), newEntry);
                     
@@ -267,33 +298,51 @@
                 }
             };
 
-            const confirmDelete = async () => {
-                try { await deleteDoc(doc(db, DB_COLLECTION, deleteConfirmId)); setDeleteConfirmId(null); } 
-                catch (error) { alert("Silinemedi: " + error.message); }
+            // --- SOFT DELETE (Çöp Kutusuna Taşı) ---
+            const confirmSoftDelete = async () => {
+                try {
+                    const historyEntry = { updatedAt: new Date().toISOString(), action: 'Çöp Kutusuna Taşındı', user: user.email };
+                    await updateDoc(doc(db, DB_COLLECTION, deleteConfirmId), { 
+                        isDeleted: true,
+                        history: [...(entries.find(e => e.id === deleteConfirmId)?.history || []), historyEntry]
+                    });
+                    setDeleteConfirmId(null);
+                } catch (error) { alert("Silinemedi: " + error.message); }
             };
 
-            // --- GÜNCELLEME (FIREBASE) - DETAYLI LOG İLE ---
+            // --- RESTORE (Geri Yükle) ---
+            const handleRestore = async (id) => {
+                try {
+                    const historyEntry = { updatedAt: new Date().toISOString(), action: 'Çöp Kutusundan Geri Yüklendi', user: user.email };
+                    await updateDoc(doc(db, DB_COLLECTION, id), { 
+                        isDeleted: false,
+                        history: [...(entries.find(e => e.id === id)?.history || []), historyEntry]
+                    });
+                } catch (error) { alert("Geri yüklenemedi: " + error.message); }
+            };
+
+            // --- PERMANENT DELETE (Kalıcı Silme) ---
+            const confirmPermanentDelete = async () => {
+                try {
+                    await deleteDoc(doc(db, DB_COLLECTION, permanentDeleteId));
+                    setPermanentDeleteId(null);
+                } catch (error) { alert("Silinemedi: " + error.message); }
+            };
+
             const saveEdit = async () => {
                 if (!editingItem) return;
                 try {
                     const changes = [];
                     const oldData = editingItem.original;
                     const newData = editingItem;
-
-                    // Tarih formatı için yardımcı
                     const formatDate = (d) => new Date(d).toLocaleDateString('tr-TR');
 
-                    if (oldData.receiptNo !== newData.receiptNo) changes.push(`Makbuz No: ${oldData.receiptNo} -> ${newData.receiptNo}`);
-                    // Tarih değişikliği
+                    if (oldData.receiptNo !== newData.receiptNo) changes.push(`Makbuz: ${oldData.receiptNo} -> ${newData.receiptNo}`);
                     if (oldData.date !== newData.date) changes.push(`Tarih: ${formatDate(oldData.date)} -> ${formatDate(newData.date)}`);
                     if (parseFloat(oldData.amount) !== parseFloat(newData.amount)) changes.push(`Tutar: ${formatCurrency(oldData.amount)} -> ${formatCurrency(newData.amount)}`);
-                    // Personel değişikliği
                     if (oldData.staffName !== newData.staffName) changes.push(`Personel: ${oldData.staffName} -> ${newData.staffName}`);
-                    // Müşteri değişikliği
                     if (oldData.customerName !== newData.customerName) changes.push(`Müşteri: ${oldData.customerName} -> ${newData.customerName}`);
-                    // Ofis değişikliği
                     if (oldData.office !== newData.office) changes.push(`Ofis: ${oldData.office} -> ${newData.office}`);
-                    
                     if (oldData.status !== newData.status) changes.push(`Durum: ${oldData.status} -> ${newData.status}`);
                     
                     const actionText = changes.length > 0 ? changes.join(', ') : 'Düzenleme yapıldı';
@@ -304,13 +353,11 @@
                         amount: parseFloat(editingItem.amount),
                         history: [...(editingItem.history || []), historyEntry]
                     };
-                    delete updateData.original; // Gereksiz alanı sil
+                    delete updateData.original;
 
                     await updateDoc(doc(db, DB_COLLECTION, editingItem.id), updateData);
                     setEditingItem(null);
-                } catch (error) {
-                    alert("Güncellenemedi: " + error.message);
-                }
+                } catch (error) { alert("Güncellenemedi: " + error.message); }
             };
 
             const toggleStatus = async (entry) => { 
@@ -321,90 +368,24 @@
                 } catch (error) { console.error(error); }
             };
 
-            // --- PDF OLUŞTURMA (jsPDF) ---
             const generatePDF = (entry) => {
                 const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a5" });
-                
-                // Türkçe karakterleri "normalize" et (Basit çözüm)
-                // jsPDF'in varsayılan fontları Türkçe karakter desteklemez, harici font yüklemek gerekir.
-                // Tek dosya çözümünde font yüklemek dosya boyutunu çok şişirir.
-                // Bu yüzden karakterleri İngilizce karşılıklarına çeviriyoruz.
-                const trToEn = (str) => {
-                    if(!str) return "";
-                    return str.toString()
-                        .replace(/Ğ/g, "G").replace(/ğ/g, "g")
-                        .replace(/Ü/g, "U").replace(/ü/g, "u")
-                        .replace(/Ş/g, "S").replace(/ş/g, "s")
-                        .replace(/İ/g, "I").replace(/ı/g, "i")
-                        .replace(/Ö/g, "O").replace(/ö/g, "o")
-                        .replace(/Ç/g, "C").replace(/ç/g, "c");
-                };
-
+                const trToEn = (str) => { if(!str) return ""; return str.toString().replace(/Ğ/g, "G").replace(/ğ/g, "g").replace(/Ü/g, "U").replace(/ü/g, "u").replace(/Ş/g, "S").replace(/ş/g, "s").replace(/İ/g, "I").replace(/ı/g, "i").replace(/Ö/g, "O").replace(/ö/g, "o").replace(/Ç/g, "C").replace(/ç/g, "c"); };
                 const title = "TAHSILAT MAKBUZU";
                 const dateStr = new Date(entry.date).toLocaleDateString('tr-TR');
                 
-                // Çerçeve
-                doc.setLineWidth(0.5);
-                doc.rect(10, 10, 190, 128);
-
-                // Başlık
-                doc.setFontSize(22);
-                doc.setTextColor(26, 86, 219); // Mavi
-                doc.text(title, 105, 25, null, null, "center");
-                
-                // Sağ Üst Bilgi
-                doc.setFontSize(10);
-                doc.setTextColor(0, 0, 0);
-                doc.text(`Tarih: ${dateStr}`, 190, 20, null, null, "right");
-                doc.text(`Makbuz No: #${entry.receiptNo}`, 190, 25, null, null, "right");
-
-                // Çizgi
-                doc.setDrawColor(200, 200, 200);
-                doc.line(20, 35, 190, 35);
-
-                // İçerik
+                doc.setLineWidth(0.5); doc.rect(10, 10, 190, 128);
+                doc.setFontSize(22); doc.setTextColor(26, 86, 219); doc.text(title, 105, 25, null, null, "center");
+                doc.setFontSize(10); doc.setTextColor(0, 0, 0); doc.text(`Tarih: ${dateStr}`, 190, 20, null, null, "right"); doc.text(`Makbuz No: #${entry.receiptNo}`, 190, 25, null, null, "right");
+                doc.setDrawColor(200, 200, 200); doc.line(20, 35, 190, 35);
                 doc.setFontSize(12);
-                const startY = 50;
-                const gap = 12;
-
-                const addRow = (label, value, y) => {
-                    doc.setFont("helvetica", "bold");
-                    doc.text(trToEn(label), 25, y);
-                    doc.setFont("helvetica", "normal");
-                    doc.text(trToEn(value), 70, y);
-                    doc.line(70, y + 2, 180, y + 2); // Alt çizgi
-                };
-
-                addRow("Sayin:", entry.customerName, startY);
-                addRow("Ofis:", entry.office || "-", startY + gap);
-                addRow("Tutar:", formatCurrency(entry.amount).replace("₺", "TL"), startY + gap * 2);
-                addRow("Tahsil Eden:", entry.staffName, startY + gap * 3);
-
-                // Tutar Kutusu
-                doc.setFillColor(240, 240, 250);
-                doc.rect(130, startY + gap * 2 - 6, 50, 10, "F");
-                doc.setFont("helvetica", "bold");
-                doc.setTextColor(26, 86, 219);
-                doc.text(formatCurrency(entry.amount).replace("₺", "TL"), 155, startY + gap * 2, null, null, "center");
-
-                // Alt Kısım
-                doc.setTextColor(0, 0, 0);
-                doc.setFontSize(10);
-                doc.setFont("helvetica", "normal");
-                
-                const signY = 110;
-                doc.text("Teslim Eden", 50, signY, null, null, "center");
-                doc.text("(Imza)", 50, signY + 5, null, null, "center");
-
-                doc.text("Teslim Alan", 160, signY, null, null, "center");
-                doc.text(trToEn(entry.staffName), 160, signY + 5, null, null, "center");
-                doc.text("(Imza)", 160, signY + 10, null, null, "center");
-
-                // Filigran
-                doc.setTextColor(230, 230, 230);
-                doc.setFontSize(60);
-                doc.text("TAHSILAT", 105, 90, null, 45, "center");
-
+                const startY = 50; const gap = 12;
+                const addRow = (label, value, y) => { doc.setFont("helvetica", "bold"); doc.text(trToEn(label), 25, y); doc.setFont("helvetica", "normal"); doc.text(trToEn(value), 70, y); doc.line(70, y + 2, 180, y + 2); };
+                addRow("Sayin:", entry.customerName, startY); addRow("Ofis:", entry.office || "-", startY + gap); addRow("Tutar:", formatCurrency(entry.amount).replace("₺", "TL"), startY + gap * 2); addRow("Tahsil Eden:", entry.staffName, startY + gap * 3);
+                doc.setFillColor(240, 240, 250); doc.rect(130, startY + gap * 2 - 6, 50, 10, "F"); doc.setFont("helvetica", "bold"); doc.setTextColor(26, 86, 219); doc.text(formatCurrency(entry.amount).replace("₺", "TL"), 155, startY + gap * 2, null, null, "center");
+                doc.setTextColor(0, 0, 0); doc.setFontSize(10); doc.setFont("helvetica", "normal");
+                const signY = 110; doc.text("Teslim Eden", 50, signY, null, null, "center"); doc.text("(Imza)", 50, signY + 5, null, null, "center"); doc.text("Teslim Alan", 160, signY, null, null, "center"); doc.text(trToEn(entry.staffName), 160, signY + 5, null, null, "center"); doc.text("(Imza)", 160, signY + 10, null, null, "center");
+                doc.setTextColor(230, 230, 230); doc.setFontSize(60); doc.text("TAHSILAT", 105, 90, null, 45, "center");
                 doc.save(`Makbuz_${entry.receiptNo}.pdf`);
             };
 
@@ -419,25 +400,33 @@
             const downloadBackup = () => { 
                 if (entries.length === 0) return alert("Veri yok."); 
                 let csv = "\uFEFFMakbuz No;Tarih;Personel;Ofis;Müşteri;Tutar;Durum\n"; 
-                entries.forEach(e => { csv += `"${e.receiptNo || ''}";${e.date};"${e.staffName}";"${e.office}";"${e.customerName}";${e.amount.toString().replace('.', ',')};"${e.status || ''}"\n`; }); 
+                // Sadece silinmemişleri yedekle
+                entries.filter(e => !e.isDeleted).forEach(e => { csv += `"${e.receiptNo || ''}";${e.date};"${e.staffName}";"${e.office}";"${e.customerName}";${e.amount.toString().replace('.', ',')};"${e.status || ''}"\n`; }); 
                 const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })); 
                 link.download = `pesinat_yedek_${new Date().toISOString().slice(0,10)}.csv`; link.click(); 
             };
 
-            const filteredEntries = entries.filter(e => {
+            // --- FİLTRELEME ---
+            // Ana liste için: Silinmemiş olanlar
+            const filteredEntries = entries.filter(e => !e.isDeleted).filter(e => {
                 const term = searchTerm.toLowerCase(); const status = (e.status || '').toLowerCase(); const receipt = (e.receiptNo || '').toLowerCase();
                 let matchesDate = true; if (dateFilter.start) matchesDate = matchesDate && e.date >= dateFilter.start; if (dateFilter.end) matchesDate = matchesDate && e.date <= dateFilter.end;
                 return (receipt.includes(term) || e.staffName.toLowerCase().includes(term) || e.customerName.toLowerCase().includes(term) || (e.office || '').toLowerCase().includes(term) || status.includes(term)) && matchesDate;
             });
 
+            // Çöp kutusu için: Silinmiş olanlar
+            const trashEntries = entries.filter(e => e.isDeleted);
+
             const totalAmount = filteredEntries.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
             
             const stats = useMemo(() => {
-                const totalRevenue = entries.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+                // İstatistikler sadece aktif (silinmemiş) kayıtlar üzerinden hesaplanır
+                const activeEntries = entries.filter(e => !e.isDeleted);
+                const totalRevenue = activeEntries.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
                 const currentMonth = new Date().toISOString().slice(0, 7);
-                const monthlyRevenue = entries.filter(e => e.date.startsWith(currentMonth)).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-                const officeStats = {}; entries.forEach(e => { const office = e.office || 'Belirtilmemiş'; officeStats[office] = (officeStats[office] || 0) + (parseFloat(e.amount) || 0); });
-                const staffStats = {}; entries.forEach(e => { staffStats[e.staffName] = (staffStats[e.staffName] || 0) + (parseFloat(e.amount) || 0); });
+                const monthlyRevenue = activeEntries.filter(e => e.date.startsWith(currentMonth)).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+                const officeStats = {}; activeEntries.forEach(e => { const office = e.office || 'Belirtilmemiş'; officeStats[office] = (officeStats[office] || 0) + (parseFloat(e.amount) || 0); });
+                const staffStats = {}; activeEntries.forEach(e => { staffStats[e.staffName] = (staffStats[e.staffName] || 0) + (parseFloat(e.amount) || 0); });
                 const sortedStaff = Object.entries(staffStats).sort(([,a], [,b]) => b - a).slice(0, 5);
                 return { totalRevenue, monthlyRevenue, officeStats, sortedStaff };
             }, [entries]);
@@ -445,20 +434,17 @@
             // --- GİRİŞ EKRANI ---
             if (!user) {
                 return (
-                    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
-                        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200">
-                            <div className="flex justify-center mb-6"><div className="bg-blue-100 p-4 rounded-full"><Icons.Cloud className="w-8 h-8 text-blue-600" /></div></div>
-                            <h2 className="text-2xl font-bold text-center text-slate-800 mb-2">Güvenli Giriş</h2>
-                            <p className="text-center text-slate-500 mb-6 text-sm">Firebase Hesabınızla Giriş Yapın</p>
+                    <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4 transition-colors duration-300">
+                        <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200 dark:border-slate-700">
+                            <div className="flex justify-center mb-6"><div className="bg-blue-100 dark:bg-blue-900 p-4 rounded-full"><Icons.Cloud className="w-8 h-8 text-blue-600 dark:text-blue-300" /></div></div>
+                            <h2 className="text-2xl font-bold text-center text-slate-800 dark:text-slate-100 mb-2">Güvenli Giriş</h2>
+                            <p className="text-center text-slate-500 dark:text-slate-400 mb-6 text-sm">Firebase Hesabınızla Giriş Yapın</p>
                             <form onSubmit={handleLogin} className="space-y-4">
-                                <div><label className="block text-sm font-medium text-slate-700 mb-1">E-Posta</label><div className="relative"><div className="absolute left-3 top-3 w-4 h-4 text-slate-400"><Icons.User className="w-4 h-4" /></div><input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="ornek@sirket.com" autoFocus required /></div></div>
-                                <div><label className="block text-sm font-medium text-slate-700 mb-1">Şifre</label><div className="relative"><div className="absolute left-3 top-3 w-4 h-4 text-slate-400"><Icons.Ticket className="w-4 h-4" /></div><input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="••••••••" required /></div></div>
-                                {loginError && (<div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm flex items-center gap-2 animate-pulse"><Icons.AlertCircle className="w-4 h-4" />{loginError}</div>)}
+                                <div><label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">E-Posta</label><div className="relative"><div className="absolute left-3 top-3 w-4 h-4 text-slate-400"><Icons.User className="w-4 h-4" /></div><input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:bg-slate-700 dark:text-white" placeholder="ornek@sirket.com" autoFocus required /></div></div>
+                                <div><label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Şifre</label><div className="relative"><div className="absolute left-3 top-3 w-4 h-4 text-slate-400"><Icons.Ticket className="w-4 h-4" /></div><input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all dark:bg-slate-700 dark:text-white" placeholder="••••••••" required /></div></div>
+                                {loginError && (<div className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-300 p-3 rounded-lg text-sm flex items-center gap-2 animate-pulse"><Icons.AlertCircle className="w-4 h-4" />{loginError}</div>)}
                                 <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2"><Icons.LogIn className="w-4 h-4" /> Giriş Yap</button>
                             </form>
-                            <div className="mt-4 p-3 bg-yellow-50 text-yellow-700 text-xs rounded border border-yellow-200">
-                                <strong>Dikkat:</strong> Firebase Konsolunda "Authentication" kısmından "Email/Password" seçeneğini aktif etmeyi unutmayın.
-                            </div>
                         </div>
                     </div>
                 );
@@ -466,52 +452,65 @@
 
             // --- ANA EKRAN ---
             return (
-                <div className="min-h-screen bg-slate-50 p-4 md:p-8 relative">
+                <div className={`min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-4 md:p-8 relative transition-colors duration-300`}>
                     {/* MODALLAR */}
-                    {deleteConfirmId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full"><h3 className="text-lg font-bold text-slate-900 text-center">Emin misiniz?</h3><p className="text-slate-500 mt-1 text-sm text-center">Bu kayıt veritabanından kalıcı olarak silinecek.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setDeleteConfirmId(null)} className="flex-1 py-2 bg-slate-100 rounded text-slate-700">İptal</button><button onClick={confirmDelete} className="flex-1 py-2 bg-red-600 text-white rounded">Sil</button></div></div></div>)}
-                    {imagePreviewUrl && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setImagePreviewUrl(null)}><div className="bg-white p-2 rounded-lg max-w-3xl max-h-[90vh] overflow-auto"><img src={imagePreviewUrl} alt="Dekont" className="max-w-full h-auto rounded" /><div className="text-center mt-2 text-sm text-slate-500">Kapatmak için dışarı tıklayın</div></div></div>)}
+                    {deleteConfirmId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full"><h3 className="text-lg font-bold text-slate-900 dark:text-white text-center">Çöp Kutusuna Taşı?</h3><p className="text-slate-500 dark:text-slate-400 mt-1 text-sm text-center">Bu kaydı daha sonra geri yükleyebilirsiniz.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setDeleteConfirmId(null)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-200">İptal</button><button onClick={confirmSoftDelete} className="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700">Sil</button></div></div></div>)}
+                    
+                    {permanentDeleteId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full border-2 border-red-500"><h3 className="text-lg font-bold text-red-600 text-center">DİKKAT: KALICI SİLME!</h3><p className="text-slate-500 dark:text-slate-400 mt-1 text-sm text-center">Bu işlem geri alınamaz. Kayıt tamamen yok olacak.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setPermanentDeleteId(null)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-200">Vazgeç</button><button onClick={confirmPermanentDelete} className="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-bold">KALICI SİL</button></div></div></div>)}
+
+                    {imagePreviewUrl && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setImagePreviewUrl(null)}><div className="bg-white dark:bg-slate-800 p-2 rounded-lg max-w-3xl max-h-[90vh] overflow-auto"><img src={imagePreviewUrl} alt="Dekont" className="max-w-full h-auto rounded" /><div className="text-center mt-2 text-sm text-slate-500 dark:text-slate-400">Kapatmak için dışarı tıklayın</div></div></div>)}
+                    
                     {editingItem && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-8">
-                                <div className="flex items-center justify-between p-6 border-b border-slate-100"><h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Icons.Pencil className="w-5 h-5 text-blue-600" /> Kaydı Düzenle</h3><button onClick={() => setEditingItem(null)}><Icons.X className="w-6 h-6 text-slate-400" /></button></div>
+                            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl my-8 border dark:border-slate-700">
+                                <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-700"><h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2"><Icons.Pencil className="w-5 h-5 text-blue-600" /> Kaydı Düzenle</h3><button onClick={() => setEditingItem(null)}><Icons.X className="w-6 h-6 text-slate-400" /></button></div>
                                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2"><label className="text-sm font-semibold">Makbuz No</label><input type="text" value={editingItem.receiptNo} disabled className="w-full p-2.5 border rounded-lg font-mono bg-slate-100 text-slate-500" /></div>
-                                    <div className="space-y-2"><label className="text-sm font-semibold">Tarih</label><input type="date" value={editingItem.date} onChange={(e) => setEditingItem(p => ({...p, date: e.target.value}))} className="w-full p-2.5 border rounded-lg" /></div>
-                                    <div className="space-y-2"><label className="text-sm font-semibold">Tutar (TL)</label><input type="number" value={editingItem.amount} onChange={(e) => setEditingItem(p => ({...p, amount: e.target.value}))} className="w-full p-2.5 border rounded-lg font-mono" /></div>
-                                    <div className="space-y-2"><label className="text-sm font-semibold">Personel</label><input type="text" value={editingItem.staffName} onChange={(e) => setEditingItem(p => ({...p, staffName: e.target.value}))} className="w-full p-2.5 border rounded-lg" /></div>
-                                    <div className="space-y-2"><label className="text-sm font-semibold">Müşteri</label><input type="text" value={editingItem.customerName} onChange={(e) => setEditingItem(p => ({...p, customerName: e.target.value}))} className="w-full p-2.5 border rounded-lg" /></div>
-                                    <div className="space-y-2"><label className="text-sm font-semibold">Ofis</label><input type="text" value={editingItem.office} onChange={(e) => setEditingItem(p => ({...p, office: e.target.value}))} className="w-full p-2.5 border rounded-lg" /></div>
-                                    <div className="space-y-2"><label className="text-sm font-semibold">Durum</label><select value={editingItem.status} onChange={(e) => setEditingItem(p => ({...p, status: e.target.value}))} className="w-full p-2.5 border rounded-lg bg-white"><option value="Teslim Edilmedi">Teslim Edilmedi</option><option value="Teslim Edildi">Teslim Edildi</option></select></div>
-                                    <div className="col-span-1 md:col-span-2 mt-4 border-t border-slate-100 pt-4">
-                                        <h4 className="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2"><Icons.History className="w-4 h-4" /> İşlem Geçmişi</h4>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Makbuz No</label><input type="text" value={editingItem.receiptNo} disabled className="w-full p-2.5 border dark:border-slate-600 rounded-lg font-mono bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400" /></div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Tarih</label><input type="date" value={editingItem.date} onChange={(e) => setEditingItem(p => ({...p, date: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900" /></div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Tutar (TL)</label><input type="number" value={editingItem.amount} onChange={(e) => setEditingItem(p => ({...p, amount: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg font-mono dark:bg-slate-900" /></div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Personel</label><input type="text" value={editingItem.staffName} onChange={(e) => setEditingItem(p => ({...p, staffName: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900" /></div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Müşteri</label><input type="text" value={editingItem.customerName} onChange={(e) => setEditingItem(p => ({...p, customerName: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900" /></div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Ofis</label><input type="text" value={editingItem.office} onChange={(e) => setEditingItem(p => ({...p, office: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900" /></div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Durum</label><select value={editingItem.status} onChange={(e) => setEditingItem(p => ({...p, status: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900"><option value="Teslim Edilmedi">Teslim Edilmedi</option><option value="Teslim Edildi">Teslim Edildi</option></select></div>
+                                    <div className="col-span-1 md:col-span-2 mt-4 border-t border-slate-100 dark:border-slate-700 pt-4">
+                                        <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2"><Icons.History className="w-4 h-4" /> İşlem Geçmişi</h4>
                                         {editingItem.history && editingItem.history.length > 0 ? (
-                                            <div className="bg-slate-50 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2 history-scroll border border-slate-100">
+                                            <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2 history-scroll border border-slate-100 dark:border-slate-700">
                                                 {editingItem.history.slice().reverse().map((h, index) => (
-                                                    <div key={index} className="text-xs text-slate-600 flex justify-between items-center border-b border-slate-200 last:border-0 pb-1.5 mb-1.5 last:pb-0 last:mb-0">
+                                                    <div key={index} className="text-xs text-slate-600 dark:text-slate-400 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 last:border-0 pb-1.5 mb-1.5 last:pb-0 last:mb-0">
                                                         <span className="font-medium flex-1">{h.action}</span>
-                                                        <span className="text-slate-400 font-mono text-[10px] ml-2">{new Date(h.updatedAt).toLocaleString('tr-TR')}</span>
+                                                        <span className="text-slate-400 dark:text-slate-500 font-mono text-[10px] ml-2">{new Date(h.updatedAt).toLocaleString('tr-TR')}</span>
                                                     </div>
                                                 ))}
                                             </div>
                                         ) : <div className="text-xs text-slate-400 italic p-2">Henüz geçmiş işlem kaydı yok.</div>}
                                     </div>
                                 </div>
-                                <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-xl"><button onClick={() => setEditingItem(null)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-200 rounded-lg font-medium">İptal</button><button onClick={saveEdit} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2"><Icons.Save className="w-4 h-4" /> Kaydet</button></div>
+                                <div className="p-6 border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3 bg-slate-50 dark:bg-slate-800 rounded-b-xl"><button onClick={() => setEditingItem(null)} className="px-5 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg font-medium">İptal</button><button onClick={saveEdit} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2"><Icons.Save className="w-4 h-4" /> Kaydet</button></div>
                             </div>
                         </div>
                     )}
 
                     {/* HEADER */}
                     <div className="max-w-6xl mx-auto space-y-6">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
-                            <div><h1 className="text-2xl font-bold text-blue-900 flex items-center gap-2"><Icons.Cloud className="w-8 h-8 text-blue-600" /> Peşinat Tablosu</h1><p className="text-slate-500 text-sm mt-1 flex items-center gap-1"><Icons.User className="w-3 h-3 text-green-500" /> Giriş Yapıldı: {user.email}</p></div>
-                            <div className="flex flex-wrap items-center gap-2 bg-slate-100 p-1 rounded-lg">
-                                <button onClick={() => setViewMode('list')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'list' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}><Icons.List className="w-4 h-4" /> Liste</button>
-                                <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'dashboard' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}><Icons.LayoutDashboard className="w-4 h-4" /> İstatistikler</button>
-                                <div className="h-6 w-px bg-slate-300 mx-1"></div>
-                                <button onClick={downloadBackup} className="px-3 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-white hover:shadow transition-all flex items-center gap-1" title="Excel Olarak İndir"><Icons.Download className="w-4 h-4" /> Excel</button>
-                                <div className="h-6 w-px bg-slate-300 mx-1"></div>
-                                <button onClick={handleLogout} className="px-3 py-2 rounded-md text-sm font-medium text-red-500 hover:bg-red-50 transition-colors" title="Çıkış Yap"><Icons.Lock className="w-4 h-4" /></button>
+                        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 flex flex-col md:flex-row items-center justify-between gap-4">
+                            <div>
+                                <h1 className="text-2xl font-bold text-blue-900 dark:text-blue-400 flex items-center gap-2"><Icons.Cloud className="w-8 h-8 text-blue-600 dark:text-blue-400" /> Peşinat Tablosu</h1>
+                                <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 flex items-center gap-1">
+                                    <Icons.User className={`w-3 h-3 ${isAdmin ? 'text-red-500' : 'text-green-500'}`} /> 
+                                    {user.email} <span className="text-xs bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded ml-2">{isAdmin ? 'Yönetici' : 'Personel'}</span>
+                                </p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
+                                <button onClick={() => setViewMode('list')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'list' ? 'bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-300' : 'text-slate-500 dark:text-slate-300 hover:text-slate-700'}`}><Icons.List className="w-4 h-4" /> Liste</button>
+                                <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'dashboard' ? 'bg-white dark:bg-slate-600 shadow text-blue-600 dark:text-blue-300' : 'text-slate-500 dark:text-slate-300 hover:text-slate-700'}`}><Icons.LayoutDashboard className="w-4 h-4" /> İstatistikler</button>
+                                {isAdmin && (
+                                    <button onClick={() => setViewMode('trash')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'trash' ? 'bg-red-100 dark:bg-red-900 shadow text-red-600 dark:text-red-300' : 'text-slate-500 dark:text-slate-300 hover:text-red-500'}`}><Icons.Trash2 className="w-4 h-4" /> Çöp Kutusu</button>
+                                )}
+                                <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                                <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-md text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-600" title={darkMode ? "Aydınlık Mod" : "Karanlık Mod"}>{darkMode ? <Icons.Sun className="w-4 h-4" /> : <Icons.Moon className="w-4 h-4" />}</button>
+                                <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1"></div>
+                                <button onClick={handleLogout} className="px-3 py-2 rounded-md text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Çıkış Yap"><Icons.Lock className="w-4 h-4" /></button>
                             </div>
                         </div>
 
@@ -519,47 +518,90 @@
                         {viewMode === 'dashboard' && (
                             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg shadow-blue-200"><div className="text-blue-100 text-sm font-medium mb-1">Toplam Ciro</div><div className="text-3xl font-bold">{formatCurrency(stats.totalRevenue)}</div></div>
-                                    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm"><div className="text-slate-500 text-sm font-medium mb-1">Bu Ayın Cirosu</div><div className="text-3xl font-bold text-slate-800">{formatCurrency(stats.monthlyRevenue)}</div></div>
+                                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg shadow-blue-200 dark:shadow-none"><div className="text-blue-100 text-sm font-medium mb-1">Toplam Ciro</div><div className="text-3xl font-bold">{formatCurrency(stats.totalRevenue)}</div></div>
+                                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm"><div className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Bu Ayın Cirosu</div><div className="text-3xl font-bold text-slate-800 dark:text-white">{formatCurrency(stats.monthlyRevenue)}</div></div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                                        <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Icons.Building2 className="w-5 h-5 text-slate-400" /> Ofis Performansı</h3>
-                                        <div className="space-y-3">{Object.entries(stats.officeStats).map(([office, amount]) => (<div key={office}><div className="flex justify-between text-sm mb-1"><span className="font-medium text-slate-700">{office}</span><span className="text-slate-500">{formatCurrency(amount)}</span></div><div className="w-full bg-slate-100 rounded-full h-2.5"><div className="bg-blue-500 h-2.5 rounded-full" style={{ width: `${(amount / stats.totalRevenue) * 100}%` }}></div></div></div>))}</div>
+                                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                        <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2"><Icons.Building2 className="w-5 h-5 text-slate-400" /> Ofis Performansı</h3>
+                                        <div className="space-y-3">{Object.entries(stats.officeStats).map(([office, amount]) => (<div key={office}><div className="flex justify-between text-sm mb-1"><span className="font-medium text-slate-700 dark:text-slate-300">{office}</span><span className="text-slate-500 dark:text-slate-400">{formatCurrency(amount)}</span></div><div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5"><div className="bg-blue-500 h-2.5 rounded-full" style={{ width: `${(amount / stats.totalRevenue) * 100}%` }}></div></div></div>))}</div>
                                     </div>
-                                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                                        <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Icons.User className="w-5 h-5 text-slate-400" /> En İyi 5 Personel</h3>
-                                        <div className="space-y-4">{stats.sortedStaff.map(([name, amount], index) => (<div key={name} className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{index + 1}</div><div className="flex-1"><div className="text-sm font-medium text-slate-800">{name}</div><div className="text-xs text-slate-500">{formatCurrency(amount)}</div></div><div className="text-blue-600 font-bold text-sm">%{Math.round((amount / stats.totalRevenue) * 100)}</div></div>))}</div>
+                                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                        <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2"><Icons.User className="w-5 h-5 text-slate-400" /> En İyi 5 Personel</h3>
+                                        <div className="space-y-4">{stats.sortedStaff.map(([name, amount], index) => (<div key={name} className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>{index + 1}</div><div className="flex-1"><div className="text-sm font-medium text-slate-800 dark:text-slate-200">{name}</div><div className="text-xs text-slate-500 dark:text-slate-400">{formatCurrency(amount)}</div></div><div className="text-blue-600 dark:text-blue-400 font-bold text-sm">%{Math.round((amount / stats.totalRevenue) * 100)}</div></div>))}</div>
                                     </div>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* ÇÖP KUTUSU (SADECE ADMIN) */}
+                        {viewMode === 'trash' && isAdmin && (
+                            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden animate-in fade-in">
+                                <div className="p-4 bg-red-50 dark:bg-red-900/20 border-b border-red-100 dark:border-red-900/30 flex justify-between items-center">
+                                    <h2 className="font-bold text-red-700 dark:text-red-400 flex items-center gap-2"><Icons.Trash2 className="w-5 h-5" /> Çöp Kutusu</h2>
+                                    <span className="text-xs text-red-500 dark:text-red-400">Buradan silinenler geri getirilemez.</span>
+                                </div>
+                                {trashEntries.length === 0 ? (
+                                    <div className="p-12 text-center text-slate-400 dark:text-slate-500">Çöp kutusu boş.</div>
+                                ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-400 text-sm uppercase tracking-wider">
+                                                    <th className="p-4 font-semibold">Makbuz</th><th className="p-4 font-semibold">Müşteri</th><th className="p-4 font-semibold">Tutar</th><th className="p-4 font-semibold">Silen</th><th className="p-4 font-semibold text-right">İşlem</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                                {trashEntries.map(entry => {
+                                                    // Silme işlemini kimin yaptığını geçmişten bul
+                                                    const deletedBy = entry.history?.find(h => h.action === 'Çöp Kutusuna Taşındı')?.user || 'Bilinmiyor';
+                                                    return (
+                                                        <tr key={entry.id} className="hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
+                                                            <td className="p-4 font-mono text-slate-700 dark:text-slate-300">{entry.receiptNo}</td>
+                                                            <td className="p-4 text-slate-700 dark:text-slate-300">{entry.customerName}</td>
+                                                            <td className="p-4 font-mono text-slate-700 dark:text-slate-300">{formatCurrency(entry.amount)}</td>
+                                                            <td className="p-4 text-xs text-slate-500">{deletedBy}</td>
+                                                            <td className="p-4 text-right">
+                                                                <div className="flex items-center justify-end gap-2">
+                                                                    <button onClick={() => handleRestore(entry.id)} className="px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-xs font-bold hover:bg-green-200 flex items-center gap-1"><Icons.RotateCcw className="w-3 h-3" /> Geri Al</button>
+                                                                    <button onClick={() => setPermanentDeleteId(entry.id)} className="px-3 py-1.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded text-xs font-bold hover:bg-red-200 flex items-center gap-1"><Icons.Ban className="w-3 h-3" /> Kalıcı Sil</button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
                             </div>
                         )}
 
                         {/* LISTE */}
                         {viewMode === 'list' && (
                             <>
-                                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
-                                    <h2 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2"><Icons.PlusCircle className="w-5 h-5" /> Yeni Kayıt Ekle</h2>
+                                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
+                                    <h2 className="text-lg font-semibold mb-4 text-slate-700 dark:text-slate-200 flex items-center gap-2"><Icons.PlusCircle className="w-5 h-5" /> Yeni Kayıt Ekle</h2>
                                     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
-                                        <div className="space-y-1 lg:col-span-1"><label className="text-xs font-medium text-slate-500 flex items-center gap-1"><Icons.Ticket className="w-3 h-3" /> Makbuz No</label><input type="text" name="receiptNo" value={formData.receiptNo} disabled className="w-full p-2 border border-slate-300 rounded-lg bg-slate-100 font-mono text-blue-800 font-bold cursor-not-allowed" /></div>
-                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500">Tarih</label><input type="date" name="date" value={formData.date} onChange={(e) => setFormData(p => ({...p, date: e.target.value}))} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500" required /></div>
-                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500">Personel</label><input type="text" name="staffName" placeholder="Örn: Ahmet" value={formData.staffName} onChange={(e) => setFormData(p => ({...p, staffName: e.target.value}))} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500" required /></div>
-                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500">Ofis</label><input type="text" name="office" placeholder="Örn: Merkez" value={formData.office} onChange={(e) => setFormData(p => ({...p, office: e.target.value}))} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500" /></div>
-                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500">Müşteri</label><input type="text" name="customerName" placeholder="Örn: Ayşe" value={formData.customerName} onChange={(e) => setFormData(p => ({...p, customerName: e.target.value}))} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500" required /></div>
-                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500">Tutar (TL)</label><input type="number" name="amount" placeholder="0.00" value={formData.amount} onChange={(e) => setFormData(p => ({...p, amount: e.target.value}))} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:border-green-500 font-mono" required /></div>
-                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500 flex items-center gap-1"><Icons.Paperclip className="w-3 h-3" /> Dekont</label><input type="file" ref={fileInputRef} accept="image/*" onChange={(e) => handleImageUpload(e.target.files[0], (base64) => setFormData(p => ({...p, image: base64})))} className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700"/></div>
+                                        <div className="space-y-1 lg:col-span-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1"><Icons.Ticket className="w-3 h-3" /> Makbuz No</label><input type="text" name="receiptNo" value={formData.receiptNo} disabled className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-100 dark:bg-slate-700 font-mono text-blue-800 dark:text-blue-300 font-bold cursor-not-allowed" /></div>
+                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tarih</label><input type="date" name="date" value={formData.date} onChange={(e) => setFormData(p => ({...p, date: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" required /></div>
+                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Personel</label><input type="text" name="staffName" placeholder="Örn: Ahmet" value={formData.staffName} onChange={(e) => setFormData(p => ({...p, staffName: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" required /></div>
+                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Ofis</label><input type="text" name="office" placeholder="Örn: Merkez" value={formData.office} onChange={(e) => setFormData(p => ({...p, office: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" /></div>
+                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Müşteri</label><input type="text" name="customerName" placeholder="Örn: Ayşe" value={formData.customerName} onChange={(e) => setFormData(p => ({...p, customerName: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" required /></div>
+                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tutar (TL)</label><input type="number" name="amount" placeholder="0.00" value={formData.amount} onChange={(e) => setFormData(p => ({...p, amount: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-green-500 font-mono dark:bg-slate-900" required /></div>
+                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1"><Icons.Paperclip className="w-3 h-3" /> Dekont</label><input type="file" ref={fileInputRef} accept="image/*" onChange={(e) => handleImageUpload(e.target.files[0], (base64) => setFormData(p => ({...p, image: base64})))} className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-50 dark:bg-slate-700 file:text-blue-700 dark:text-blue-300"/></div>
                                         <div className="lg:col-span-7 flex justify-end mt-2"><button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium shadow-sm w-full md:w-auto flex justify-center items-center gap-2"><Icons.PlusCircle className="w-4 h-4" /> Listeye Ekle</button></div>
                                     </form>
                                 </div>
 
-                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col md:flex-row items-center justify-between gap-4">
-                                        <div className="relative w-full md:w-64"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Icons.Search className="h-4 w-4 text-slate-400" /></div><input type="text" className="block w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" placeholder="Ara..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-                                        <div className="flex items-center gap-2 bg-white p-1.5 border border-slate-200 rounded-lg shadow-sm">
-                                            <div className="flex items-center gap-1"><span className="text-xs text-slate-400 font-medium pl-2">Başlangıç:</span><input type="date" value={dateFilter.start} onChange={e => setDateFilter(prev => ({...prev, start: e.target.value}))} className="text-sm border-none outline-none text-slate-600 bg-transparent" /></div>
-                                            <div className="w-px h-4 bg-slate-200"></div>
-                                            <div className="flex items-center gap-1"><span className="text-xs text-slate-400 font-medium">Bitiş:</span><input type="date" value={dateFilter.end} onChange={e => setDateFilter(prev => ({...prev, end: e.target.value}))} className="text-sm border-none outline-none text-slate-600 bg-transparent" /></div>
-                                            {(dateFilter.start || dateFilter.end) && (<button onClick={() => setDateFilter({start:'', end:''})} className="p-1 hover:bg-slate-100 rounded-full text-slate-400"><Icons.X className="w-3 h-3" /></button>)}
+                                <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                                    <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex flex-col md:flex-row items-center justify-between gap-4">
+                                        <div className="relative w-full md:w-64"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Icons.Search className="h-4 w-4 text-slate-400" /></div><input type="text" className="block w-full pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:border-blue-500 dark:bg-slate-900 dark:text-white" placeholder="Ara..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+                                        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                                            <div className="flex items-center gap-1"><span className="text-xs text-slate-400 font-medium pl-2">Başlangıç:</span><input type="date" value={dateFilter.start} onChange={e => setDateFilter(prev => ({...prev, start: e.target.value}))} className="text-sm border-none outline-none text-slate-600 dark:text-slate-300 bg-transparent" /></div>
+                                            <div className="w-px h-4 bg-slate-200 dark:bg-slate-600"></div>
+                                            <div className="flex items-center gap-1"><span className="text-xs text-slate-400 font-medium">Bitiş:</span><input type="date" value={dateFilter.end} onChange={e => setDateFilter(prev => ({...prev, end: e.target.value}))} className="text-sm border-none outline-none text-slate-600 dark:text-slate-300 bg-transparent" /></div>
+                                            {(dateFilter.start || dateFilter.end) && (<button onClick={() => setDateFilter({start:'', end:''})} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-400"><Icons.X className="w-3 h-3" /></button>)}
                                         </div>
                                     </div>
 
@@ -572,36 +614,36 @@
                                     <div className="overflow-x-auto">
                                         <table className="w-full text-left border-collapse">
                                             <thead>
-                                                <tr className="bg-white border-b border-slate-200 text-slate-600 text-sm uppercase tracking-wider">
+                                                <tr className="bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 text-sm uppercase tracking-wider">
                                                     <th className="p-4 font-semibold w-24">Makbuz</th><th className="p-4 font-semibold w-28">Tarih</th><th className="p-4 font-semibold">Personel</th><th className="p-4 font-semibold">Ofis</th><th className="p-4 font-semibold">Müşteri</th><th className="p-4 font-semibold text-center w-16">Ek</th><th className="p-4 font-semibold w-32 text-center">Durum</th><th className="p-4 font-semibold text-right">Nakit</th><th className="p-4 font-semibold w-40 text-center">İşlem</th>
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-slate-100">
+                                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                                                 {filteredEntries.map((entry) => {
                                                     const isDelivered = entry.status === 'Teslim Edildi';
                                                     return (
-                                                        <tr key={entry.id} className="hover:bg-blue-50 transition-colors group">
-                                                            <td className="p-4 font-mono font-bold text-blue-900">{entry.receiptNo || '-'}</td>
-                                                            <td className="p-4 text-slate-600 text-sm">{new Date(entry.date).toLocaleDateString('tr-TR')}</td>
-                                                            <td className="p-4 text-slate-800 font-medium">{entry.staffName}</td>
-                                                            <td className="p-4 text-slate-600 text-sm">{entry.office}</td>
-                                                            <td className="p-4 text-slate-800">{entry.customerName}</td>
+                                                        <tr key={entry.id} className="hover:bg-blue-50 dark:hover:bg-slate-700/50 transition-colors group">
+                                                            <td className="p-4 font-mono font-bold text-blue-900 dark:text-blue-300">{entry.receiptNo || '-'}</td>
+                                                            <td className="p-4 text-slate-600 dark:text-slate-400 text-sm">{new Date(entry.date).toLocaleDateString('tr-TR')}</td>
+                                                            <td className="p-4 text-slate-800 dark:text-slate-200 font-medium">{entry.staffName}</td>
+                                                            <td className="p-4 text-slate-600 dark:text-slate-400 text-sm">{entry.office}</td>
+                                                            <td className="p-4 text-slate-800 dark:text-slate-200">{entry.customerName}</td>
                                                             <td className="p-4 text-center">{entry.image && (<button onClick={() => setImagePreviewUrl(entry.image)} className="text-slate-400 hover:text-blue-600 transition-colors" title="Dekontu Gör"><Icons.ImageIcon className="w-5 h-5" /></button>)}</td>
-                                                            <td className="p-4 text-center"><button onClick={() => toggleStatus(entry)} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold border ${isDelivered ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200' : 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100'}`}>{isDelivered ? <Icons.CheckCircle2 className="w-3 h-3" /> : <Icons.Clock className="w-3 h-3" />} {entry.status || 'Bekliyor'}</button></td>
-                                                            <td className="p-4 text-right font-mono font-medium text-slate-700">{formatCurrency(entry.amount)}</td>
+                                                            <td className="p-4 text-center"><button onClick={() => toggleStatus(entry)} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold border ${isDelivered ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-200' : 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100'}`}>{isDelivered ? <Icons.CheckCircle2 className="w-3 h-3" /> : <Icons.Clock className="w-3 h-3" />} {entry.status || 'Bekliyor'}</button></td>
+                                                            <td className="p-4 text-right font-mono font-medium text-slate-700 dark:text-slate-300">{formatCurrency(entry.amount)}</td>
                                                             <td className="p-4 text-center">
                                                                 <div className="flex items-center justify-center gap-1">
-                                                                    <button onClick={() => printReceipt(entry)} className="text-slate-400 hover:text-slate-700 p-1.5 rounded hover:bg-slate-100" title="Hızlı Yazdır"><Icons.Printer className="w-4 h-4" /></button>
-                                                                    <button onClick={() => generatePDF(entry)} className="text-red-500 hover:text-red-700 p-1.5 rounded hover:bg-red-50" title="PDF Olarak İndir"><Icons.FileText className="w-4 h-4" /></button>
-                                                                    <button onClick={() => setEditingItem({...entry, original: {...entry}})} className="text-blue-400 hover:text-blue-600 p-1.5 rounded hover:bg-blue-100" title="Düzenle"><Icons.Pencil className="w-4 h-4" /></button>
-                                                                    <button onClick={() => setDeleteConfirmId(entry.id)} className="text-slate-400 hover:text-red-500 p-1.5 rounded hover:bg-red-50" title="Sil"><Icons.Trash2 className="w-4 h-4" /></button>
+                                                                    <button onClick={() => printReceipt(entry)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="Hızlı Yazdır"><Icons.Printer className="w-4 h-4" /></button>
+                                                                    <button onClick={() => generatePDF(entry)} className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20" title="PDF Olarak İndir"><Icons.FileText className="w-4 h-4" /></button>
+                                                                    <button onClick={() => setEditingItem({...entry, original: {...entry}})} className="text-blue-400 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 p-1.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/20" title="Düzenle"><Icons.Pencil className="w-4 h-4" /></button>
+                                                                    <button onClick={() => setDeleteConfirmId(entry.id)} className="text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20" title="Çöp Kutusuna Taşı"><Icons.Trash2 className="w-4 h-4" /></button>
                                                                 </div>
                                                             </td>
                                                         </tr>
                                                     );
                                                 })}
                                             </tbody>
-                                            <tfoot className="bg-slate-50 font-bold text-slate-800"><tr><td colSpan="7" className="p-4 text-right text-slate-600 uppercase text-sm">{dateFilter.start || dateFilter.end ? 'Tarih Aralığı Toplamı:' : (searchTerm ? 'Filtreli Toplam:' : 'Genel Toplam:')}</td><td className="p-4 text-right text-green-700 font-mono text-lg">{formatCurrency(totalAmount)}</td><td></td></tr></tfoot>
+                                            <tfoot className="bg-slate-50 dark:bg-slate-800/50 font-bold text-slate-800 dark:text-white"><tr><td colSpan="7" className="p-4 text-right text-slate-600 dark:text-slate-400 uppercase text-sm">{dateFilter.start || dateFilter.end ? 'Tarih Aralığı Toplamı:' : (searchTerm ? 'Filtreli Toplam:' : 'Genel Toplam:')}</td><td className="p-4 text-right text-green-700 dark:text-green-400 font-mono text-lg">{formatCurrency(totalAmount)}</td><td></td></tr></tfoot>
                                         </table>
                                     </div>
                                     )}
