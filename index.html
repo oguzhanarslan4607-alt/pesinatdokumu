@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Peşinat Takip Tablosu (ONLINE - FIREBASE)</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        @media print {
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        // --- FIREBASE KÜTÜPHANELERİ ---
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // =================================================================
+        // --- BURAYI KENDİ BİLGİLERİNLE DEĞİŞTİR (BAŞLANGIÇ) ---
+       const firebaseConfig = {
+  apiKey: "AIzaSyDEGpqDzFjMMJxqey1nG5kWearDmZsSNao",
+  authDomain: "pesinatdokumu.firebaseapp.com",
+  projectId: "pesinatdokumu",
+  storageBucket: "pesinatdokumu.firebasestorage.app",
+  messagingSenderId: "619959488442",
+  appId: "1:619959488442:web:4b787b415d023c2c4c5783",
+  measurementId: "G-XX93ZSFYK2"
+};
+        
+        // --- BURAYI KENDİ BİLGİLERİNLE DEĞİŞTİR (BİTİŞ) ---
+        // =================================================================
+
+        // Firebase'i Başlat
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const DB_COLLECTION = "pesinatlar"; // Veritabanındaki tablo adı
+
+        const { useState, useEffect, useRef, useMemo } = React;
+        
+        // --- İKONLAR (Değişmedi) ---
+        const ICON_PATHS = {
+            'trash-2': <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>,
+            'plus-circle': <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></>,
+            'user': <><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></>,
+            'building-2': <><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></>,
+            'download': <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>,
+            'upload': <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></>,
+            'cloud': <><path d="M17.5 19c0-3.037-2.463-5.5-5.5-5.5S6.5 15.963 6.5 19"/><path d="M17.5 19c3.037 0 5.5-2.463 5.5-5.5S20.537 8 17.5 8h-1.7c-1.3-3.5-4.9-6-8.8-6-5.5 0-10 4.5-10 10 0 1.5.4 3 1 4.2"/></>,
+            'search': <><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>,
+            'check-circle-2': <><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></>,
+            'clock': <><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></>,
+            'pencil': <><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></>,
+            'x': <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>,
+            'save': <><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></>,
+            'alert-circle': <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></>,
+            'ticket': <><path d="M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/><path d="M13 5v2"/><path d="M13 17v2"/><path d="M13 11v2"/></>,
+            'printer': <><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></>,
+            'image': <><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></>,
+            'layout-dashboard': <><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></>,
+            'list': <><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></>,
+            'paperclip': <><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></>,
+            'lock': <><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>,
+            'log-in': <><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></>,
+            'hard-drive': <><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></>,
+            'wallet': <><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><path d="M18 12a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h4v-8Z"/></>
+        };
+
+        const Icon = ({ name, size = 20, className, ...props }) => {
+            const content = ICON_PATHS[name];
+            if (!content) return null;
+            return (
+                <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                    {content}
+                </svg>
+            );
+        };
+
+        const Icons = {
+            Trash2: (p) => <Icon name="trash-2" {...p} />,
+            PlusCircle: (p) => <Icon name="plus-circle" {...p} />,
+            User: (p) => <Icon name="user" {...p} />,
+            Building2: (p) => <Icon name="building-2" {...p} />,
+            Wallet: (p) => <Icon name="wallet" {...p} />,
+            Download: (p) => <Icon name="download" {...p} />,
+            Upload: (p) => <Icon name="upload" {...p} />,
+            Cloud: (p) => <Icon name="cloud" {...p} />,
+            Search: (p) => <Icon name="search" {...p} />,
+            CheckCircle2: (p) => <Icon name="check-circle-2" {...p} />,
+            Clock: (p) => <Icon name="clock" {...p} />,
+            Pencil: (p) => <Icon name="pencil" {...p} />,
+            X: (p) => <Icon name="x" {...p} />,
+            Save: (p) => <Icon name="save" {...p} />,
+            AlertCircle: (p) => <Icon name="alert-circle" {...p} />,
+            Ticket: (p) => <Icon name="ticket" {...p} />,
+            Printer: (p) => <Icon name="printer" {...p} />,
+            ImageIcon: (p) => <Icon name="image" {...p} />,
+            LayoutDashboard: (p) => <Icon name="layout-dashboard" {...p} />,
+            List: (p) => <Icon name="list" {...p} />,
+            Paperclip: (p) => <Icon name="paperclip" {...p} />,
+            Lock: (p) => <Icon name="lock" {...p} />,
+            LogIn: (p) => <Icon name="log-in" {...p} />,
+            HardDrive: (p) => <Icon name="hard-drive" {...p} />
+        };
+
+        // --- MAIN APPLICATION COMPONENT ---
+        function MainApp() {
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [loginId, setLoginId] = useState('');
+            const [loginPass, setLoginPass] = useState('');
+            const [loginError, setLoginError] = useState('');
+
+            // LocalStorage yerine boş dizi ile başlıyoruz, Firebase'den dolduracağız
+            const [entries, setEntries] = useState([]);
+            const [isLoading, setIsLoading] = useState(true);
+            
+            const [viewMode, setViewMode] = useState('list');
+            const [searchTerm, setSearchTerm] = useState('');
+            const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+
+            const [editingItem, setEditingItem] = useState(null);
+            const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+            const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+            
+            const [formData, setFormData] = useState({
+                receiptNo: '000001',
+                date: new Date().toISOString().split('T')[0],
+                staffName: '',
+                office: '',
+                customerName: '',
+                amount: '',
+                image: null
+            });
+
+            const fileInputRef = useRef(null);
+            const editFileInputRef = useRef(null);
+
+            // --- FIREBASE VERİ ÇEKME (CANLI TAKİP) ---
+            useEffect(() => {
+                if (!isAuthenticated) return;
+
+                // Veritabanındaki 'pesinatlar' tablosunu dinle
+                // orderBy('createdAt', 'desc') -> En yeni eklenen en üstte
+                const q = query(collection(db, DB_COLLECTION));
+                
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    const loadedData = snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                    
+                    // Client tarafında tarihe göre sıralayalım (Opsiyonel)
+                    loadedData.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                    
+                    setEntries(loadedData);
+                    setIsLoading(false);
+                }, (error) => {
+                    console.error("Veri çekme hatası:", error);
+                    alert("Veriler yüklenirken hata oluştu: " + error.message);
+                    setIsLoading(false);
+                });
+
+                // Sayfa kapanırken dinlemeyi durdur
+                return () => unsubscribe();
+            }, [isAuthenticated]);
+
+            // Otomatik Makbuz No
+            useEffect(() => {
+                if (entries.length > 0) {
+                    let maxReceiptNo = 0;
+                    entries.forEach(entry => {
+                        const num = parseInt(entry.receiptNo || "0", 10);
+                        if (!isNaN(num) && num > maxReceiptNo) {
+                            maxReceiptNo = num;
+                        }
+                    });
+                    const nextNo = (maxReceiptNo + 1).toString().padStart(6, '0');
+                    
+                    setFormData(prev => {
+                        if (!prev.staffName && !prev.amount && !prev.customerName) {
+                            return { ...prev, receiptNo: nextNo };
+                        }
+                        return prev;
+                    });
+                }
+            }, [entries]);
+
+            // --- GİRİŞ FONKSİYONU ---
+            const handleLogin = (e) => {
+                e.preventDefault();
+                // Basit şifreleme (Geliştirilebilir)
+                if (loginId === '1052519451' && loginPass === 'icardi1905') {
+                    setIsAuthenticated(true);
+                    setLoginError('');
+                } else {
+                    setLoginError('Hatalı ID veya Şifre!');
+                }
+            };
+
+            // --- DOSYA YÜKLEME ---
+            const handleImageUpload = (file, callback) => {
+                if (!file) return;
+                // Veritabanı şişmesin diye limit: 1MB
+                if (file.size > 1 * 1024 * 1024) { alert("Dosya boyutu çok büyük! Lütfen 1MB'dan küçük bir resim seçin."); return; }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 800;
+                        let width = img.width; let height = img.height;
+                        if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                        canvas.width = width; canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        // Kaliteyi biraz daha düşürdük (0.5) yer kaplamasın diye
+                        callback(canvas.toDataURL('image/jpeg', 0.5));
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            };
+
+            const handleChange = (e) => { const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: value })); };
+            const handleFileChange = (e) => { const file = e.target.files[0]; handleImageUpload(file, (base64) => { setFormData(prev => ({ ...prev, image: base64 })); }); };
+            const handleEditFileChange = (e) => { const file = e.target.files[0]; handleImageUpload(file, (base64) => { setEditingItem(prev => ({ ...prev, image: base64 })); }); };
+
+            // --- YENİ KAYIT EKLEME (FIREBASE) ---
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                if (!formData.staffName || !formData.amount) return;
+                
+                try {
+                    const newEntry = {
+                        ...formData,
+                        amount: parseFloat(formData.amount),
+                        status: 'Teslim Edilmedi',
+                        history: [],
+                        createdAt: new Date().toISOString()
+                    };
+
+                    // Firebase'e ekle
+                    await addDoc(collection(db, DB_COLLECTION), newEntry);
+                    
+                    // Formu temizle (Liste otomatik güncellenecek)
+                    const currentNo = parseInt(formData.receiptNo || "0", 10);
+                    const nextNo = (currentNo + 1).toString().padStart(6, '0');
+                    setFormData({ receiptNo: nextNo, date: formData.date, staffName: '', office: '', customerName: '', amount: '', image: null });
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                    
+                } catch (error) {
+                    console.error("Ekleme hatası:", error);
+                    alert("Kayıt eklenirken bir hata oluştu: " + error.message);
+                }
+            };
+
+            const handleDeleteClick = (id) => setDeleteConfirmId(id);
+
+            // --- SİLME (FIREBASE) ---
+            const confirmDelete = async () => {
+                try {
+                    await deleteDoc(doc(db, DB_COLLECTION, deleteConfirmId));
+                    setDeleteConfirmId(null);
+                } catch (error) {
+                    console.error("Silme hatası:", error);
+                    alert("Silinirken hata oluştu.");
+                }
+            };
+
+            const handleEditClick = (item) => setEditingItem({ ...item, original: { ...item } });
+            const handleEditChange = (e) => { const { name, value } = e.target; setEditingItem(prev => ({ ...prev, [name]: value })); };
+
+            // --- GÜNCELLEME (FIREBASE) ---
+            const saveEdit = async () => {
+                if (!editingItem) return;
+                try {
+                    const historyEntry = { updatedAt: new Date().toISOString(), action: 'Düzenleme' };
+                    
+                    const updateData = {
+                        receiptNo: editingItem.receiptNo,
+                        date: editingItem.date,
+                        staffName: editingItem.staffName,
+                        office: editingItem.office,
+                        customerName: editingItem.customerName,
+                        amount: parseFloat(editingItem.amount),
+                        status: editingItem.status,
+                        image: editingItem.image,
+                        history: [...(editingItem.history || []), historyEntry]
+                    };
+
+                    await updateDoc(doc(db, DB_COLLECTION, editingItem.id), updateData);
+                    setEditingItem(null);
+                } catch (error) {
+                    console.error("Güncelleme hatası:", error);
+                    alert("Güncellenirken hata oluştu.");
+                }
+            };
+
+            const toggleStatus = async (entry) => { 
+                try {
+                    const newStatus = entry.status === 'Teslim Edildi' ? 'Teslim Edilmedi' : 'Teslim Edildi'; 
+                    const historyEntry = { updatedAt: new Date().toISOString(), type: 'status_change', oldData: { ...entry } };
+                    
+                    await updateDoc(doc(db, DB_COLLECTION, entry.id), {
+                        status: newStatus,
+                        history: [...(entry.history || []), historyEntry]
+                    });
+                } catch (error) {
+                    console.error("Durum hatası:", error);
+                }
+            };
+
+            const printReceipt = (entry) => {
+                const printWindow = window.open('', '', 'width=800,height=600');
+                const formattedDate = new Date(entry.date).toLocaleDateString('tr-TR');
+                const formattedAmount = new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(entry.amount);
+                const htmlContent = `<html><head><title>Tahsilat Makbuzu</title><style>body{font-family:'Helvetica',sans-serif;padding:40px;color:#333}.receipt-box{border:2px solid #333;padding:30px;max-width:700px;margin:0 auto;position:relative}.header{display:flex;justify-content:space-between;border-bottom:2px solid #eee;padding-bottom:20px;margin-bottom:20px}.title{font-size:24px;font-weight:bold;color:#1a56db}.row{display:flex;margin-bottom:15px}.label{width:150px;font-weight:bold;color:#555}.value{flex:1;border-bottom:1px dotted #ccc}.amount-box{margin-top:30px;text-align:right;font-size:28px;font-weight:bold;color:#1a56db}.footer{margin-top:50px;display:flex;justify-content:space-between;font-size:12px;text-align:center}.sign-box{width:200px;border-top:1px solid #333;padding-top:10px}.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:100px;opacity:0.05;font-weight:bold;pointer-events:none}</style></head><body><div class="receipt-box"><div class="watermark">TAHSİLAT</div><div class="header"><div><div class="title">TAHSİLAT MAKBUZU</div></div><div style="text-align:right"><div>No: <strong>${entry.receiptNo}</strong></div><div>Tarih: <strong>${formattedDate}</strong></div></div></div><div class="content"><div class="row"><div class="label">Sayın:</div><div class="value">${entry.customerName}</div></div><div class="row"><div class="label">Ofis:</div><div class="value">${entry.office || '-'}</div></div><div class="row"><div class="label">Tutar:</div><div class="value">${formattedAmount}</div></div><div class="row"><div class="label">Tahsil Eden:</div><div class="value">${entry.staffName}</div></div></div><div class="amount-box">${formattedAmount}</div><div class="footer"><div class="sign-box">Teslim Eden (İmza)</div><div class="sign-box">Teslim Alan<br>${entry.staffName}</div></div></div><script>window.onload=function(){window.print()}<\/script></body></html>`;
+                printWindow.document.write(htmlContent); printWindow.document.close();
+            };
+
+            const downloadBackup = () => { if (entries.length === 0) return alert("Veri yok."); let csv = "\uFEFFMakbuz No;Tarih;Personel;Ofis;Müşteri;Tutar;Durum\n"; entries.forEach(e => { csv += `"${e.receiptNo || ''}";${e.date};"${e.staffName}";"${e.office}";"${e.customerName}";${e.amount.toString().replace('.', ',')};"${e.status || ''}"\n`; }); const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' })); link.download = `pesinat_yedek_${new Date().toISOString().slice(0,10)}.csv`; link.click(); };
+
+            const filteredEntries = entries.filter(e => {
+                const term = searchTerm.toLowerCase(); const status = (e.status || '').toLowerCase(); const receipt = (e.receiptNo || '').toLowerCase();
+                let matchesDate = true; if (dateFilter.start) matchesDate = matchesDate && e.date >= dateFilter.start; if (dateFilter.end) matchesDate = matchesDate && e.date <= dateFilter.end;
+                return (receipt.includes(term) || e.staffName.toLowerCase().includes(term) || e.customerName.toLowerCase().includes(term) || (e.office || '').toLowerCase().includes(term) || status.includes(term)) && matchesDate;
+            });
+
+            const formatCurrency = (val) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
+            const totalAmount = filteredEntries.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+            
+            const stats = useMemo(() => {
+                const totalRevenue = entries.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+                const currentMonth = new Date().toISOString().slice(0, 7);
+                const monthlyRevenue = entries.filter(e => e.date.startsWith(currentMonth)).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+                const officeStats = {}; entries.forEach(e => { const office = e.office || 'Belirtilmemiş'; officeStats[office] = (officeStats[office] || 0) + (parseFloat(e.amount) || 0); });
+                const staffStats = {}; entries.forEach(e => { staffStats[e.staffName] = (staffStats[e.staffName] || 0) + (parseFloat(e.amount) || 0); });
+                const sortedStaff = Object.entries(staffStats).sort(([,a], [,b]) => b - a).slice(0, 5);
+                return { totalRevenue, monthlyRevenue, officeStats, sortedStaff };
+            }, [entries]);
+
+            // --- LOGIN SCREEN ---
+            if (!isAuthenticated) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
+                        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200">
+                            <div className="flex justify-center mb-6"><div className="bg-blue-100 p-4 rounded-full"><Icons.Cloud className="w-8 h-8 text-blue-600" /></div></div>
+                            <h2 className="text-2xl font-bold text-center text-slate-800 mb-2">Bulut Giriş</h2>
+                            <p className="text-center text-slate-500 mb-6 text-sm">Verileriniz güvenli sunucuda saklanmaktadır.</p>
+                            <form onSubmit={handleLogin} className="space-y-4">
+                                <div><label className="block text-sm font-medium text-slate-700 mb-1">Kullanıcı ID</label><div className="relative"><div className="absolute left-3 top-3 w-4 h-4 text-slate-400"><Icons.User className="w-4 h-4" /></div><input type="text" value={loginId} onChange={(e) => setLoginId(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="ID giriniz" autoFocus /></div></div>
+                                <div><label className="block text-sm font-medium text-slate-700 mb-1">Şifre</label><div className="relative"><div className="absolute left-3 top-3 w-4 h-4 text-slate-400"><Icons.Ticket className="w-4 h-4" /></div><input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all" placeholder="••••••••" /></div></div>
+                                {loginError && (<div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm flex items-center gap-2 animate-pulse"><Icons.AlertCircle className="w-4 h-4" />{loginError}</div>)}
+                                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2"><Icons.LogIn className="w-4 h-4" /> Giriş Yap</button>
+                            </form>
+                            <div className="mt-6 text-center text-xs text-slate-400">Peşinat Takip Sistemi v5.0 (Online)</div>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-slate-50 p-4 md:p-8 relative">
+                    {/* MODALLAR */}
+                    {deleteConfirmId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white rounded-xl shadow-2xl p-6 max-w-sm w-full"><h3 className="text-lg font-bold text-slate-900 text-center">Emin misiniz?</h3><p className="text-slate-500 mt-1 text-sm text-center">Bu kayıt kalıcı olarak silinecek.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setDeleteConfirmId(null)} className="flex-1 py-2 bg-slate-100 rounded text-slate-700">İptal</button><button onClick={confirmDelete} className="flex-1 py-2 bg-red-600 text-white rounded">Sil</button></div></div></div>)}
+                    {imagePreviewUrl && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setImagePreviewUrl(null)}><div className="bg-white p-2 rounded-lg max-w-3xl max-h-[90vh] overflow-auto"><img src={imagePreviewUrl} alt="Dekont" className="max-w-full h-auto rounded" /><div className="text-center mt-2 text-sm text-slate-500">Kapatmak için dışarı tıklayın</div></div></div>)}
+                    {editingItem && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+                            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl my-8">
+                                <div className="flex items-center justify-between p-6 border-b border-slate-100"><h3 className="text-xl font-bold text-slate-800 flex items-center gap-2"><Icons.Pencil className="w-5 h-5 text-blue-600" /> Kaydı Düzenle</h3><button onClick={() => setEditingItem(null)}><Icons.X className="w-6 h-6 text-slate-400" /></button></div>
+                                <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Makbuz No</label><input type="text" name="receiptNo" value={editingItem.receiptNo} onChange={handleEditChange} className="w-full p-2.5 border rounded-lg font-mono" /></div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Tarih</label><input type="date" name="date" value={editingItem.date} onChange={handleEditChange} className="w-full p-2.5 border rounded-lg" /></div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Tutar (TL)</label><input type="number" name="amount" value={editingItem.amount} onChange={handleEditChange} className="w-full p-2.5 border rounded-lg font-mono" /></div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Personel</label><input type="text" name="staffName" value={editingItem.staffName} onChange={handleEditChange} className="w-full p-2.5 border rounded-lg" /></div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Müşteri</label><input type="text" name="customerName" value={editingItem.customerName} onChange={handleEditChange} className="w-full p-2.5 border rounded-lg" /></div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Ofis</label><input type="text" name="office" value={editingItem.office} onChange={handleEditChange} className="w-full p-2.5 border rounded-lg" /></div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-semibold">Dekont/Görsel</label>
+                                        <div className="flex items-center gap-2">
+                                            <input type="file" ref={editFileInputRef} accept="image/*" onChange={handleEditFileChange} className="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                                            {editingItem.image && (<button type="button" onClick={() => setImagePreviewUrl(editingItem.image)} className="p-2 text-blue-600 hover:bg-blue-50 rounded" title="Görüntüle"><Icons.ImageIcon className="w-5 h-5" /></button>)}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Durum</label><select name="status" value={editingItem.status} onChange={handleEditChange} className="w-full p-2.5 border rounded-lg bg-white"><option value="Teslim Edilmedi">Teslim Edilmedi</option><option value="Teslim Edildi">Teslim Edildi</option></select></div>
+                                </div>
+                                <div className="p-6 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-xl"><button onClick={() => setEditingItem(null)} className="px-5 py-2.5 text-slate-600 hover:bg-slate-200 rounded-lg font-medium">İptal</button><button onClick={saveEdit} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center gap-2"><Icons.Save className="w-4 h-4" /> Kaydet</button></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* HEADER */}
+                    <div className="max-w-6xl mx-auto space-y-6">
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
+                            <div><h1 className="text-2xl font-bold text-blue-900 flex items-center gap-2"><Icons.Cloud className="w-8 h-8 text-blue-600" /> Peşinat Tablosu (Online)</h1><p className="text-slate-500 text-sm mt-1 flex items-center gap-1"><Icons.CheckCircle2 className="w-3 h-3 text-green-500" /> Veriler bulutta saklanıyor</p></div>
+                            <div className="flex flex-wrap items-center gap-2 bg-slate-100 p-1 rounded-lg">
+                                <button onClick={() => setViewMode('list')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'list' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}><Icons.List className="w-4 h-4" /> Liste</button>
+                                <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'dashboard' ? 'bg-white shadow text-blue-600' : 'text-slate-500 hover:text-slate-700'}`}><Icons.LayoutDashboard className="w-4 h-4" /> İstatistikler</button>
+                                
+                                <div className="h-6 w-px bg-slate-300 mx-1"></div>
+                                <button onClick={downloadBackup} className="px-3 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-white hover:shadow transition-all flex items-center gap-1" title="Excel Olarak İndir"><Icons.Download className="w-4 h-4" /> İndir</button>
+
+                                <div className="h-6 w-px bg-slate-300 mx-1"></div>
+                                <button onClick={() => window.location.reload()} className="px-3 py-2 rounded-md text-sm font-medium text-red-500 hover:bg-red-50 transition-colors" title="Çıkış Yap"><Icons.Lock className="w-4 h-4" /></button>
+                            </div>
+                        </div>
+
+                        {/* DASHBOARD */}
+                        {viewMode === 'dashboard' && (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg shadow-blue-200"><div className="text-blue-100 text-sm font-medium mb-1">Toplam Ciro</div><div className="text-3xl font-bold">{formatCurrency(stats.totalRevenue)}</div></div>
+                                    <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm"><div className="text-slate-500 text-sm font-medium mb-1">Bu Ayın Cirosu</div><div className="text-3xl font-bold text-slate-800">{formatCurrency(stats.monthlyRevenue)}</div></div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                        <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Icons.Building2 className="w-5 h-5 text-slate-400" /> Ofis Performansı</h3>
+                                        <div className="space-y-3">{Object.entries(stats.officeStats).map(([office, amount]) => (<div key={office}><div className="flex justify-between text-sm mb-1"><span className="font-medium text-slate-700">{office}</span><span className="text-slate-500">{formatCurrency(amount)}</span></div><div className="w-full bg-slate-100 rounded-full h-2.5"><div className="bg-blue-500 h-2.5 rounded-full" style={{ width: `${(amount / stats.totalRevenue) * 100}%` }}></div></div></div>))}</div>
+                                    </div>
+                                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                                        <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Icons.User className="w-5 h-5 text-slate-400" /> En İyi 5 Personel</h3>
+                                        <div className="space-y-4">{stats.sortedStaff.map(([name, amount], index) => (<div key={name} className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-600'}`}>{index + 1}</div><div className="flex-1"><div className="text-sm font-medium text-slate-800">{name}</div><div className="text-xs text-slate-500">{formatCurrency(amount)}</div></div><div className="text-blue-600 font-bold text-sm">%{Math.round((amount / stats.totalRevenue) * 100)}</div></div>))}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* LISTE */}
+                        {viewMode === 'list' && (
+                            <>
+                                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                                    <h2 className="text-lg font-semibold mb-4 text-slate-700 flex items-center gap-2"><Icons.PlusCircle className="w-5 h-5" /> Yeni Kayıt Ekle</h2>
+                                    <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+                                        <div className="space-y-1 lg:col-span-1"><label className="text-xs font-medium text-slate-500 flex items-center gap-1"><Icons.Ticket className="w-3 h-3" /> Makbuz No</label><input type="text" name="receiptNo" value={formData.receiptNo} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500 bg-slate-50 font-mono text-blue-800 font-bold" required /></div>
+                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500">Tarih</label><input type="date" name="date" value={formData.date} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500" required /></div>
+                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500">Personel</label><input type="text" name="staffName" placeholder="Örn: Ahmet" value={formData.staffName} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500" required /></div>
+                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500">Ofis</label><input type="text" name="office" placeholder="Örn: Merkez" value={formData.office} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500" /></div>
+                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500">Müşteri</label><input type="text" name="customerName" placeholder="Örn: Ayşe" value={formData.customerName} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:border-blue-500" required /></div>
+                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500">Tutar (TL)</label><input type="number" name="amount" placeholder="0.00" value={formData.amount} onChange={handleChange} className="w-full p-2 border border-slate-300 rounded-lg outline-none focus:border-green-500 font-mono" required /></div>
+                                        <div className="space-y-1"><label className="text-xs font-medium text-slate-500 flex items-center gap-1"><Icons.Paperclip className="w-3 h-3" /> Dekont</label><input type="file" ref={fileInputRef} accept="image/*" onChange={handleFileChange} className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-50 file:text-blue-700"/></div>
+                                        <div className="lg:col-span-7 flex justify-end mt-2"><button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium shadow-sm w-full md:w-auto flex justify-center items-center gap-2"><Icons.PlusCircle className="w-4 h-4" /> Listeye Ekle</button></div>
+                                    </form>
+                                </div>
+
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                    <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col md:flex-row items-center justify-between gap-4">
+                                        <div className="relative w-full md:w-64"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Icons.Search className="h-4 w-4 text-slate-400" /></div><input type="text" className="block w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-sm outline-none focus:border-blue-500" placeholder="Ara..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
+                                        <div className="flex items-center gap-2 bg-white p-1.5 border border-slate-200 rounded-lg shadow-sm">
+                                            <div className="flex items-center gap-1"><span className="text-xs text-slate-400 font-medium pl-2">Başlangıç:</span><input type="date" value={dateFilter.start} onChange={e => setDateFilter(prev => ({...prev, start: e.target.value}))} className="text-sm border-none outline-none text-slate-600 bg-transparent" /></div>
+                                            <div className="w-px h-4 bg-slate-200"></div>
+                                            <div className="flex items-center gap-1"><span className="text-xs text-slate-400 font-medium">Bitiş:</span><input type="date" value={dateFilter.end} onChange={e => setDateFilter(prev => ({...prev, end: e.target.value}))} className="text-sm border-none outline-none text-slate-600 bg-transparent" /></div>
+                                            {(dateFilter.start || dateFilter.end) && (<button onClick={() => setDateFilter({start:'', end:''})} className="p-1 hover:bg-slate-100 rounded-full text-slate-400"><Icons.X className="w-3 h-3" /></button>)}
+                                        </div>
+                                    </div>
+
+                                    {isLoading ? (
+                                        <div className="p-12 text-center text-slate-500 flex flex-col items-center">
+                                            <Icons.Clock className="w-8 h-8 animate-spin mb-2 text-blue-500"/>
+                                            <p>Veriler Yükleniyor...</p>
+                                        </div>
+                                    ) : (
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left border-collapse">
+                                            <thead>
+                                                <tr className="bg-white border-b border-slate-200 text-slate-600 text-sm uppercase tracking-wider">
+                                                    <th className="p-4 font-semibold w-24">Makbuz</th><th className="p-4 font-semibold w-28">Tarih</th><th className="p-4 font-semibold">Personel</th><th className="p-4 font-semibold">Ofis</th><th className="p-4 font-semibold">Müşteri</th><th className="p-4 font-semibold text-center w-16">Ek</th><th className="p-4 font-semibold w-32 text-center">Durum</th><th className="p-4 font-semibold text-right">Nakit</th><th className="p-4 font-semibold w-36 text-center">İşlem</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {filteredEntries.map((entry) => {
+                                                    const isDelivered = entry.status === 'Teslim Edildi';
+                                                    return (
+                                                        <tr key={entry.id} className="hover:bg-blue-50 transition-colors group">
+                                                            <td className="p-4 font-mono font-bold text-blue-900">{entry.receiptNo || '-'}</td>
+                                                            <td className="p-4 text-slate-600 text-sm">{new Date(entry.date).toLocaleDateString('tr-TR')}</td>
+                                                            <td className="p-4 text-slate-800 font-medium">{entry.staffName}</td>
+                                                            <td className="p-4 text-slate-600 text-sm">{entry.office}</td>
+                                                            <td className="p-4 text-slate-800">{entry.customerName}</td>
+                                                            <td className="p-4 text-center">{entry.image && (<button onClick={() => setImagePreviewUrl(entry.image)} className="text-slate-400 hover:text-blue-600 transition-colors" title="Dekontu Gör"><Icons.ImageIcon className="w-5 h-5" /></button>)}</td>
+                                                            <td className="p-4 text-center"><button onClick={() => toggleStatus(entry)} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold border ${isDelivered ? 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200' : 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100'}`}>{isDelivered ? <Icons.CheckCircle2 className="w-3 h-3" /> : <Icons.Clock className="w-3 h-3" />} {entry.status || 'Bekliyor'}</button></td>
+                                                            <td className="p-4 text-right font-mono font-medium text-slate-700">{formatCurrency(entry.amount)}</td>
+                                                            <td className="p-4 text-center"><div className="flex items-center justify-center gap-1"><button onClick={() => printReceipt(entry)} className="text-slate-400 hover:text-slate-700 p-1.5 rounded hover:bg-slate-100" title="Makbuz Yazdır"><Icons.Printer className="w-4 h-4" /></button><button onClick={() => handleEditClick(entry)} className="text-blue-400 hover:text-blue-600 p-1.5 rounded hover:bg-blue-100" title="Düzenle"><Icons.Pencil className="w-4 h-4" /></button><button onClick={() => handleDeleteClick(entry.id)} className="text-slate-400 hover:text-red-500 p-1.5 rounded hover:bg-red-50" title="Sil"><Icons.Trash2 className="w-4 h-4" /></button></div></td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                            <tfoot className="bg-slate-50 font-bold text-slate-800"><tr><td colSpan="7" className="p-4 text-right text-slate-600 uppercase text-sm">{dateFilter.start || dateFilter.end ? 'Tarih Aralığı Toplamı:' : (searchTerm ? 'Filtreli Toplam:' : 'Genel Toplam:')}</td><td className="p-4 text-right text-green-700 font-mono text-lg">{formatCurrency(totalAmount)}</td><td></td></tr></tfoot>
+                                        </table>
+                                    </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<MainApp />);
+    </script>
+</body>
+</html>
