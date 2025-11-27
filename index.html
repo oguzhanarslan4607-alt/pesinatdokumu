@@ -190,15 +190,22 @@
             const [permanentDeleteId, setPermanentDeleteId] = useState(null);
             const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
             
+            // --- TEMA AYARLARI ---
             const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
             const [themeColor, setThemeColor] = useState(() => localStorage.getItem('color') || 'blue');
 
-            // Renk haritası (Hex kodları)
+            // Renk haritası (Hex kodları ile kesin çözüm)
             const themeHex = {
-                blue: '#3b82f6', emerald: '#10b981', violet: '#8b5cf6', amber: '#f59e0b'
+                blue: '#3b82f6', // blue-500
+                emerald: '#10b981', // emerald-500
+                violet: '#8b5cf6', // violet-500
+                amber: '#f59e0b' // amber-500
             };
             const darkThemeHex = {
-                blue: '#2563eb', emerald: '#059669', violet: '#7c3aed', amber: '#d97706'
+                blue: '#2563eb', // blue-600
+                emerald: '#059669', // emerald-600
+                violet: '#7c3aed', // violet-600
+                amber: '#d97706' // amber-600
             };
 
             useEffect(() => {
@@ -221,7 +228,7 @@
                 staffName: '',
                 office: '',
                 customerName: '',
-                customerPhone: '', // Telefon eklendi
+                customerPhone: '',
                 amount: '',
                 image: null
             });
@@ -231,6 +238,7 @@
 
             const formatCurrency = (val) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
 
+            // --- AUTH ---
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
                     setUser(currentUser);
@@ -242,6 +250,7 @@
                 return () => unsubscribe();
             }, []);
 
+            // --- VERİ ---
             useEffect(() => {
                 if (!user) return;
                 const q = query(collection(db, DB_COLLECTION));
@@ -261,6 +270,7 @@
                 return () => unsubscribe();
             }, [user]);
 
+            // --- MAKBUZ ---
             useEffect(() => {
                 if (!formData.staffName && !formData.amount && !formData.customerName) {
                     let maxReceiptNo = 0;
@@ -392,7 +402,10 @@
             };
 
             const generatePDF = (entry) => {
-                if (!window.jspdf) { alert("PDF kütüphanesi yüklenmedi."); return; }
+                if (!window.jspdf) {
+                    alert("PDF oluşturucu henüz yüklenmedi, lütfen sayfayı yenileyip tekrar deneyin.");
+                    return;
+                }
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a5" });
                 const trToEn = (str) => { if(!str) return ""; return str.toString().replace(/Ğ/g, "G").replace(/ğ/g, "g").replace(/Ü/g, "U").replace(/ü/g, "u").replace(/Ş/g, "S").replace(/ş/g, "s").replace(/İ/g, "I").replace(/ı/g, "i").replace(/Ö/g, "O").replace(/ö/g, "o").replace(/Ç/g, "C").replace(/ç/g, "c"); };
@@ -516,7 +529,7 @@
                             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl my-8 border dark:border-slate-700">
                                 <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-700"><h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2"><Icons.Pencil className={`w-5 h-5 text-${themeColor}-600`} /> Kaydı Düzenle</h3><button onClick={() => setEditingItem(null)}><Icons.X className="w-6 h-6 text-slate-400" /></button></div>
                                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-2"><label className="text-sm font-semibold">Makbuz No</label><input type="text" value={editingItem.receiptNo} disabled className="w-full p-2.5 border dark:border-slate-600 rounded-lg font-mono bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400" /></div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Makbuz No</label><input type="text" value={editingItem.receiptNo} onChange={(e) => setEditingItem(p => ({...p, receiptNo: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg font-mono bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:border-blue-500" /></div>
                                     <div className="space-y-2"><label className="text-sm font-semibold">Tarih</label><input type="date" value={editingItem.date} onChange={(e) => setEditingItem(p => ({...p, date: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900" /></div>
                                     <div className="space-y-2"><label className="text-sm font-semibold">Tutar (TL)</label><input type="number" value={editingItem.amount} onChange={(e) => setEditingItem(p => ({...p, amount: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg font-mono dark:bg-slate-900" /></div>
                                     <div className="space-y-2"><label className="text-sm font-semibold">Personel</label><input type="text" value={editingItem.staffName} onChange={(e) => setEditingItem(p => ({...p, staffName: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900" /></div>
@@ -700,7 +713,7 @@
                                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                                     <h2 className="text-lg font-semibold mb-4 text-slate-700 dark:text-slate-200 flex items-center gap-2"><Icons.PlusCircle className="w-5 h-5" /> Yeni Kayıt Ekle</h2>
                                     <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
-                                        <div className="space-y-1 lg:col-span-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1"><Icons.Ticket className="w-3 h-3" /> Makbuz No</label><input type="text" name="receiptNo" value={formData.receiptNo} disabled className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-100 dark:bg-slate-700 font-mono text-blue-800 dark:text-blue-300 font-bold cursor-not-allowed" /></div>
+                                        <div className="space-y-1 lg:col-span-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1"><Icons.Ticket className="w-3 h-3" /> Makbuz No</label><input type="text" name="receiptNo" value={formData.receiptNo} onChange={(e) => setFormData(p => ({...p, receiptNo: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 font-mono text-blue-800 dark:text-blue-300 font-bold focus:border-blue-500" /></div>
                                         <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tarih</label><input type="date" name="date" value={formData.date} onChange={(e) => setFormData(p => ({...p, date: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" required /></div>
                                         <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Personel</label><input type="text" name="staffName" placeholder="Örn: Ahmet" value={formData.staffName} onChange={(e) => setFormData(p => ({...p, staffName: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" required /></div>
                                         <div className="space-y-1">
