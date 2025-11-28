@@ -62,9 +62,8 @@
 
     <div id="root"></div>
 
-    <!-- PWA YAPILANDIRMASI (Otomatik Manifest ve Service Worker) -->
+    <!-- PWA YAPILANDIRMASI -->
     <script>
-        // 1. Dinamik Manifest Oluşturma
         const manifest = {
             "name": "Peşinat Takip Sistemi",
             "short_name": "Peşinat",
@@ -74,36 +73,19 @@
             "theme_color": "#2563eb",
             "orientation": "any",
             "icons": [
-                {
-                    "src": "https://cdn-icons-png.flaticon.com/512/2942/2942544.png",
-                    "sizes": "192x192",
-                    "type": "image/png"
-                },
-                {
-                    "src": "https://cdn-icons-png.flaticon.com/512/2942/2942544.png",
-                    "sizes": "512x512",
-                    "type": "image/png"
-                }
+                { "src": "https://cdn-icons-png.flaticon.com/512/2942/2942544.png", "sizes": "192x192", "type": "image/png" },
+                { "src": "https://cdn-icons-png.flaticon.com/512/2942/2942544.png", "sizes": "512x512", "type": "image/png" }
             ]
         };
         const content = encodeURIComponent(JSON.stringify(manifest));
         const url = "data:application/manifest+json," + content;
         const link = document.createElement('link');
-        link.rel = 'manifest';
-        link.href = url;
-        document.head.appendChild(link);
+        link.rel = 'manifest'; link.href = url; document.head.appendChild(link);
 
-        // 2. Service Worker (Basit Önbellekleme)
         if ('serviceWorker' in navigator) {
-            const swCode = `
-                self.addEventListener('install', (e) => self.skipWaiting());
-                self.addEventListener('fetch', (e) => {
-                    // Basit fetch işlemi, karmaşık cache yok
-                });
-            `;
+            const swCode = `self.addEventListener('install', (e) => self.skipWaiting()); self.addEventListener('fetch', (e) => {});`;
             const blob = new Blob([swCode], {type: 'application/javascript'});
-            const swUrl = URL.createObjectURL(blob);
-            navigator.serviceWorker.register(swUrl).catch(err => console.log(err));
+            navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(err => console.log(err));
         }
     </script>
 
@@ -122,15 +104,8 @@
             measurementId: "G-XX93ZSFYK2"
         };
 
-        const ADMIN_EMAILS = [
-            "admin@demo.com", 
-            "yonetici@sirket.com",
-            "oguzhanarslan4607@gmail.com"
-        ]; 
-
-        const OFFICES = [
-            "Asena", "Asrın", "Dağıtım", "Efsane", "Elbistan", "Merkez Aktif", "Star"
-        ];
+        const ADMIN_EMAILS = ["admin@demo.com", "yonetici@sirket.com", "oguzhanarslan4607@gmail.com"]; 
+        const OFFICES = ["Asena", "Asrın", "Dağıtım", "Efsane", "Elbistan", "Merkez Aktif", "Star"];
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -140,7 +115,6 @@
         const { useState, useEffect, useRef, useMemo } = React;
         const { jsPDF } = window.jspdf;
         
-        // --- İKONLAR ---
         const ICON_PATHS = {
             'trash-2': <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>,
             'plus-circle': <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></>,
@@ -174,7 +148,8 @@
             'package': <><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></>,
             'phone': <><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></>,
             'filter': <><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></>,
-            'smartphone': <><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></>
+            'smartphone': <><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></>,
+            'calendar-check': <><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 16 2 2 4-4"/></>
         };
 
         const Icon = ({ name, size = 20, className, ...props }) => {
@@ -216,7 +191,8 @@
             Package: (p) => <Icon name="package" {...p} />,
             Phone: (p) => <Icon name="phone" {...p} />,
             Filter: (p) => <Icon name="filter" {...p} />,
-            Smartphone: (p) => <Icon name="smartphone" {...p} />
+            Smartphone: (p) => <Icon name="smartphone" {...p} />,
+            CalendarCheck: (p) => <Icon name="calendar-check" {...p} />
         };
 
         function MainApp() {
@@ -237,75 +213,47 @@
             const [deleteConfirmId, setDeleteConfirmId] = useState(null);
             const [permanentDeleteId, setPermanentDeleteId] = useState(null);
             const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+
+            // Calendar State
+            const [calendarDate, setCalendarDate] = useState(new Date());
+            const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
             
             const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
             const [themeColor, setThemeColor] = useState(() => localStorage.getItem('color') || 'blue');
 
-            const themeHex = {
-                blue: '#3b82f6', emerald: '#10b981', violet: '#8b5cf6', amber: '#f59e0b'
-            };
-            const darkThemeHex = {
-                blue: '#2563eb', emerald: '#059669', violet: '#7c3aed', amber: '#d97706'
-            };
+            const themeHex = { blue: '#3b82f6', emerald: '#10b981', violet: '#8b5cf6', amber: '#f59e0b' };
+            const darkThemeHex = { blue: '#2563eb', emerald: '#059669', violet: '#7c3aed', amber: '#d97706' };
 
             useEffect(() => {
-                window.addEventListener('beforeinstallprompt', (e) => {
-                    e.preventDefault();
-                    setInstallPrompt(e);
-                });
-                
-                if (darkMode) {
-                    document.documentElement.classList.add('dark');
-                    localStorage.setItem('theme', 'dark');
-                } else {
-                    document.documentElement.classList.remove('dark');
-                    localStorage.setItem('theme', 'light');
-                }
+                window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
+                if (darkMode) { document.documentElement.classList.add('dark'); localStorage.setItem('theme', 'dark'); } 
+                else { document.documentElement.classList.remove('dark'); localStorage.setItem('theme', 'light'); }
             }, [darkMode]);
 
-            useEffect(() => {
-                localStorage.setItem('color', themeColor);
-            }, [themeColor]);
+            useEffect(() => { localStorage.setItem('color', themeColor); }, [themeColor]);
 
             const handleInstallClick = () => {
                 if (!installPrompt) return;
                 installPrompt.prompt();
-                installPrompt.userChoice.then((choiceResult) => {
-                    if (choiceResult.outcome === 'accepted') {
-                        setInstallPrompt(null);
-                    }
-                });
+                installPrompt.userChoice.then((choiceResult) => { if (choiceResult.outcome === 'accepted') setInstallPrompt(null); });
             };
 
             const [formData, setFormData] = useState({
-                receiptNo: '000001',
-                date: new Date().toISOString().split('T')[0],
-                staffName: '',
-                office: '',
-                customerName: '',
-                customerPhone: '',
-                amount: '',
-                image: null
+                receiptNo: '000001', date: new Date().toISOString().split('T')[0], staffName: '', office: '', customerName: '', customerPhone: '', amount: '', image: null
             });
 
             const fileInputRef = useRef(null);
             const editFileInputRef = useRef(null);
-
             const formatCurrency = (val) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(val);
 
-            // --- AUTH ---
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
                     setUser(currentUser);
-                    if (currentUser) {
-                        setLoginError('');
-                        setIsAdmin(ADMIN_EMAILS.includes(currentUser.email));
-                    }
+                    if (currentUser) { setLoginError(''); setIsAdmin(ADMIN_EMAILS.includes(currentUser.email)); }
                 });
                 return () => unsubscribe();
             }, []);
 
-            // --- VERİ ---
             useEffect(() => {
                 if (!user) return;
                 const q = query(collection(db, DB_COLLECTION));
@@ -318,14 +266,10 @@
                     });
                     setEntries(loadedData);
                     setIsLoading(false);
-                }, (error) => {
-                    console.error(error);
-                    setIsLoading(false);
-                });
+                }, (error) => { console.error(error); setIsLoading(false); });
                 return () => unsubscribe();
             }, [user]);
 
-            // --- MAKBUZ ---
             useEffect(() => {
                 if (!formData.staffName && !formData.amount && !formData.customerName) {
                     let maxReceiptNo = 0;
@@ -344,11 +288,7 @@
             const handleLogin = async (e) => {
                 e.preventDefault();
                 setLoginError('');
-                try {
-                    await signInWithEmailAndPassword(auth, loginEmail, loginPass);
-                } catch (error) {
-                    setLoginError("Giriş başarısız. Bilgileri kontrol edin.");
-                }
+                try { await signInWithEmailAndPassword(auth, loginEmail, loginPass); } catch (error) { setLoginError("Giriş başarısız. Bilgileri kontrol edin."); }
             };
 
             const handleLogout = async () => { try { await signOut(auth); } catch(e) { console.error(e); } };
@@ -378,23 +318,13 @@
                 e.preventDefault();
                 if (!formData.staffName || !formData.amount) return;
                 try {
-                    const newEntry = {
-                        ...formData,
-                        amount: parseFloat(formData.amount),
-                        status: 'Teslim Edilmedi',
-                        history: [],
-                        createdAt: new Date().toISOString(),
-                        createdBy: user.email,
-                        isDeleted: false
-                    };
+                    const newEntry = { ...formData, amount: parseFloat(formData.amount), status: 'Teslim Edilmedi', history: [], createdAt: new Date().toISOString(), createdBy: user.email, isDeleted: false };
                     await addDoc(collection(db, DB_COLLECTION), newEntry);
                     const currentNo = parseInt(formData.receiptNo || "0", 10);
                     const nextNo = (currentNo + 1).toString().padStart(6, '0');
                     setFormData({ receiptNo: nextNo, date: formData.date, staffName: '', office: '', customerName: '', customerPhone: '', amount: '', image: null });
                     if (fileInputRef.current) fileInputRef.current.value = "";
-                } catch (error) {
-                    alert("Hata: " + error.message);
-                }
+                } catch (error) { alert("Hata: " + error.message); }
             };
 
             const confirmSoftDelete = async () => {
@@ -457,10 +387,7 @@
             };
 
             const generatePDF = (entry) => {
-                if (!window.jspdf) {
-                    alert("PDF oluşturucu henüz yüklenmedi, lütfen sayfayı yenileyip tekrar deneyin.");
-                    return;
-                }
+                if (!window.jspdf) return alert("PDF kütüphanesi yüklenmedi.");
                 const { jsPDF } = window.jspdf;
                 const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a5" });
                 const trToEn = (str) => { if(!str) return ""; return str.toString().replace(/Ğ/g, "G").replace(/ğ/g, "g").replace(/Ü/g, "U").replace(/ü/g, "u").replace(/Ş/g, "S").replace(/ş/g, "s").replace(/İ/g, "I").replace(/ı/g, "i").replace(/Ö/g, "O").replace(/ö/g, "o").replace(/Ç/g, "C").replace(/ç/g, "c"); };
@@ -496,21 +423,12 @@
 
             const exportToExcel = () => {
                 if (entries.length === 0) return alert("Dışa aktarılacak veri yok.");
-                if (!window.XLSX) { return alert("Excel kütüphanesi yükleniyor, lütfen bekleyin..."); }
-                
+                if (!window.XLSX) { return alert("Excel kütüphanesi yükleniyor..."); }
                 const dataToExport = entries.filter(e => !e.isDeleted).map(entry => ({
-                    "Makbuz No": entry.receiptNo,
-                    "Tarih": new Date(entry.date).toLocaleDateString('tr-TR'),
-                    "Personel": entry.staffName,
-                    "Ofis": entry.office,
-                    "Müşteri": entry.customerName,
-                    "Telefon": entry.customerPhone || '',
-                    "Tutar": entry.amount,
-                    "Durum": entry.status,
-                    "Oluşturulma": new Date(entry.createdAt).toLocaleString('tr-TR'),
-                    "Oluşturan": entry.createdBy
+                    "Makbuz No": entry.receiptNo, "Tarih": new Date(entry.date).toLocaleDateString('tr-TR'),
+                    "Personel": entry.staffName, "Ofis": entry.office, "Müşteri": entry.customerName, "Telefon": entry.customerPhone || '',
+                    "Tutar": entry.amount, "Durum": entry.status, "Oluşturulma": new Date(entry.createdAt).toLocaleString('tr-TR'), "Oluşturan": entry.createdBy
                 }));
-
                 const ws = XLSX.utils.json_to_sheet(dataToExport);
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, "Pesinatlar");
@@ -535,28 +453,58 @@
                 const monthlyRevenue = activeEntries.filter(e => e.date.startsWith(currentMonth)).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
                 const todayStr = new Date().toISOString().split('T')[0];
                 const dailyRevenue = activeEntries.filter(e => e.date === todayStr).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-                const deliveredCount = activeEntries.filter(e => e.status === 'Teslim Edildi').length;
-                const pendingCount = activeEntries.filter(e => e.status === 'Teslim Edilmedi').length;
+                const deliveredEntries = activeEntries.filter(e => e.status === 'Teslim Edildi');
+                const pendingEntries = activeEntries.filter(e => e.status === 'Teslim Edilmedi');
+                const deliveredCount = deliveredEntries.length;
+                const pendingCount = pendingEntries.length;
+                const deliveredAmount = deliveredEntries.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+                const pendingAmount = pendingEntries.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
                 const totalCount = activeEntries.length || 1;
                 const deliveryRate = Math.round((deliveredCount / totalCount) * 100);
-                const deliveredAmount = activeEntries.filter(e => e.status === 'Teslim Edildi').reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-                const pendingAmount = activeEntries.filter(e => e.status === 'Teslim Edilmedi').reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-
                 const last7Days = [];
                 for (let i = 6; i >= 0; i--) {
-                    const d = new Date();
-                    d.setDate(d.getDate() - i);
-                    const dStr = d.toISOString().split('T')[0];
+                    const d = new Date(); d.setDate(d.getDate() - i); const dStr = d.toISOString().split('T')[0];
                     const dayAmount = activeEntries.filter(e => e.date === dStr).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
                     last7Days.push({ date: d.toLocaleDateString('tr-TR', {day: 'numeric', month: 'short'}), amount: dayAmount, rawDate: dStr });
                 }
                 const maxDayAmount = Math.max(...last7Days.map(d => d.amount)) || 1;
-
                 const officeStats = {}; activeEntries.forEach(e => { const office = e.office || 'Belirtilmemiş'; officeStats[office] = (officeStats[office] || 0) + (parseFloat(e.amount) || 0); });
                 const staffStats = {}; activeEntries.forEach(e => { staffStats[e.staffName] = (staffStats[e.staffName] || 0) + (parseFloat(e.amount) || 0); });
                 const sortedStaff = Object.entries(staffStats).sort(([,a], [,b]) => b - a).slice(0, 5);
                 return { totalRevenue, monthlyRevenue, dailyRevenue, deliveryStats: { deliveredCount, pendingCount, deliveryRate, deliveredAmount, pendingAmount }, last7Days, maxDayAmount, officeStats, sortedStaff };
             }, [entries]);
+
+            // TAKVİM YARDIMCI FONKSİYONLARI
+            const getCalendarDays = (year, month) => {
+                const firstDay = new Date(year, month, 1);
+                const lastDay = new Date(year, month + 1, 0);
+                const daysInMonth = lastDay.getDate();
+                const startDayOfWeek = firstDay.getDay(); // 0 = Pazar, 1 = Pzt
+                // Pazartesi başlangıçlı takvim için offset hesaplama
+                const offset = startDayOfWeek === 0 ? 6 : startDayOfWeek - 1;
+                
+                const days = [];
+                for (let i = 0; i < offset; i++) days.push(null);
+                for (let i = 1; i <= daysInMonth; i++) days.push(i);
+                return days;
+            };
+
+            const changeMonth = (increment) => {
+                const newDate = new Date(calendarDate);
+                newDate.setMonth(newDate.getMonth() + increment);
+                setCalendarDate(newDate);
+                setSelectedCalendarDate(null);
+            };
+
+            const getDailyTransactions = (dateStr) => {
+                return entries.filter(e => !e.isDeleted && e.date === dateStr);
+            };
+
+            const getDayTotal = (day) => {
+                if (!day) return 0;
+                const dateStr = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day + 1).toISOString().split('T')[0];
+                return getDailyTransactions(dateStr).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+            };
 
             if (!user) {
                 return (
@@ -632,6 +580,7 @@
                             <div className="flex flex-wrap items-center gap-2 bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
                                 <button onClick={() => setViewMode('list')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'list' ? `bg-white dark:bg-slate-600 shadow text-${themeColor}-600 dark:text-${themeColor}-300` : 'text-slate-500 dark:text-slate-300 hover:text-slate-700'}`}><Icons.List className="w-4 h-4" /> Liste</button>
                                 <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'dashboard' ? `bg-white dark:bg-slate-600 shadow text-${themeColor}-600 dark:text-${themeColor}-300` : 'text-slate-500 dark:text-slate-300 hover:text-slate-700'}`}><Icons.LayoutDashboard className="w-4 h-4" /> İstatistikler</button>
+                                <button onClick={() => setViewMode('calendar')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'calendar' ? `bg-white dark:bg-slate-600 shadow text-${themeColor}-600 dark:text-${themeColor}-300` : 'text-slate-500 dark:text-slate-300 hover:text-slate-700'}`}><Icons.CalendarCheck className="w-4 h-4" /> Takvim</button>
                                 {isAdmin && (<button onClick={() => setViewMode('trash')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${viewMode === 'trash' ? 'bg-red-100 dark:bg-red-900 shadow text-red-600 dark:text-red-300' : 'text-slate-500 dark:text-slate-300 hover:text-red-500'}`}><Icons.Trash2 className="w-4 h-4" /> Çöp Kutusu</button>)}
                                 <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1"></div>
                                 {installPrompt && <button onClick={handleInstallClick} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 bg-${themeColor}-100 text-${themeColor}-600 hover:bg-${themeColor}-200 dark:bg-${themeColor}-900 dark:text-${themeColor}-300 dark:hover:bg-${themeColor}-800 transition-all`}><Icons.Smartphone className="w-4 h-4" /> Yükle</button>}
@@ -647,6 +596,97 @@
                                 <button onClick={handleLogout} className="px-3 py-2 rounded-md text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors" title="Çıkış Yap"><Icons.Lock className="w-4 h-4" /></button>
                             </div>
                         </div>
+
+                        {viewMode === 'calendar' && (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h3 className="font-bold text-slate-700 dark:text-slate-200 text-xl flex items-center gap-2">
+                                            <Icons.CalendarCheck className={`w-6 h-6 text-${themeColor}-500`} /> 
+                                            {calendarDate.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+                                        </h3>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => changeMonth(-1)} className="px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 font-bold">←</button>
+                                            <button onClick={() => { setCalendarDate(new Date()); setSelectedCalendarDate(null); }} className="px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm">Bugün</button>
+                                            <button onClick={() => changeMonth(1)} className="px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 font-bold">→</button>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Gün Başlıkları */}
+                                    <div className="grid grid-cols-7 gap-2 mb-2 text-center">
+                                        {['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pa'].map(d => (
+                                            <div key={d} className="text-xs font-bold text-slate-400 uppercase">{d}</div>
+                                        ))}
+                                    </div>
+
+                                    {/* Takvim Grid */}
+                                    <div className="grid grid-cols-7 gap-2">
+                                        {getCalendarDays(calendarDate.getFullYear(), calendarDate.getMonth()).map((day, i) => {
+                                            if (day === null) return <div key={i} className="h-24 bg-transparent"></div>;
+                                            
+                                            const total = getDayTotal(day);
+                                            const currentDateStr = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day + 1).toISOString().split('T')[0]; // +1 for timezone fix locally
+                                            const isSelected = selectedCalendarDate === currentDateStr;
+                                            
+                                            return (
+                                                <button 
+                                                    key={i} 
+                                                    onClick={() => {
+                                                        if (total > 0) setSelectedCalendarDate(currentDateStr);
+                                                        else setSelectedCalendarDate(null);
+                                                    }}
+                                                    className={`h-24 rounded-lg border flex flex-col items-center justify-center relative transition-all
+                                                        ${isSelected ? `border-${themeColor}-500 ring-2 ring-${themeColor}-200 dark:ring-${themeColor}-900` : 'border-slate-100 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}
+                                                        ${total > 0 ? `bg-${themeColor}-50 dark:bg-${themeColor}-900/20 cursor-pointer` : 'bg-white dark:bg-slate-800/50 cursor-default'}
+                                                    `}
+                                                >
+                                                    <span className={`text-lg font-bold ${total > 0 ? `text-${themeColor}-700 dark:text-${themeColor}-300` : 'text-slate-400 dark:text-slate-600'}`}>{day}</span>
+                                                    {total > 0 && (
+                                                        <div className={`mt-1 text-xs font-bold px-2 py-1 rounded-full bg-${themeColor}-100 dark:bg-${themeColor}-900 text-${themeColor}-700 dark:text-${themeColor}-300`}>
+                                                            {formatCurrency(total).replace(',00', '')}
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Gün Detayları */}
+                                {selectedCalendarDate && (
+                                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm animate-in fade-in slide-in-from-top-4">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="font-bold text-slate-700 dark:text-slate-200 text-lg">
+                                                {new Date(selectedCalendarDate).toLocaleDateString('tr-TR')} Tarihli İşlemler
+                                            </h3>
+                                            <button onClick={() => setSelectedCalendarDate(null)} className="text-slate-400 hover:text-slate-600"><Icons.X className="w-5 h-5" /></button>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead>
+                                                    <tr className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-400 text-xs uppercase">
+                                                        <th className="p-3">Personel</th>
+                                                        <th className="p-3">Ofis</th>
+                                                        <th className="p-3">Müşteri</th>
+                                                        <th className="p-3 text-right">Tutar</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                                    {getDailyTransactions(selectedCalendarDate).map(entry => (
+                                                        <tr key={entry.id}>
+                                                            <td className="p-3 text-sm text-slate-700 dark:text-slate-300">{entry.staffName}</td>
+                                                            <td className="p-3 text-sm text-slate-500 dark:text-slate-400">{entry.office}</td>
+                                                            <td className="p-3 text-sm text-slate-700 dark:text-slate-300 font-medium">{entry.customerName}</td>
+                                                            <td className="p-3 text-sm text-right font-mono font-bold text-slate-700 dark:text-slate-300">{formatCurrency(entry.amount)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {viewMode === 'dashboard' && (
                             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
