@@ -95,19 +95,6 @@
         const OFFICES = [
             "Asena", "Asrın", "Dağıtım", "Efsane", "Elbistan", "Merkez Aktif", "Star"
         ];
-
-        // *** OFİS MÜDÜRÜ TELEFONLARI ***
-        // Lütfen buradaki numaraları gerçekleriyle değiştirin.
-        // Başında 90 olsa da olmasa da sistem otomatik düzeltecektir.
-        const OFFICE_PHONES = {
-            "Asena": "905365059966",
-            "Asrın": "905372164299",
-            "Dağıtım": "905326867475",
-            "Efsane": "905413731122",
-            "Elbistan": "905300424573",
-            "Merkez Aktif": "905417446646",
-            "Star": "905558105031"
-        };
         // =================================================================
 
         const app = initializeApp(firebaseConfig);
@@ -153,60 +140,51 @@
             'filter': <><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></>,
             'smartphone': <><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></>,
             'calendar-check': <><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 16 2 2 4-4"/></>,
-            'sticky-note': <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>,
-            'brand-whatsapp': <><path d="M18.9 5.7A12.6 12.6 0 0 0 9.75 2C2.66 2 .18 9.9.18 14.52a12.46 12.46 0 0 0 1.85 6.63L.24 26l5.28-1.38A12.52 12.52 0 0 0 9.75 27a12.65 12.65 0 0 0 12.65-12.5 12.6 12.6 0 0 0-3.5-8.8zm-9.15 19.2a10.38 10.38 0 0 1-5.33-1.47l-.38-.22-3.95 1 .96-3.65-.24-.4a10.35 10.35 0 0 1 1.75-12 10.4 10.4 0 0 1 16.53 10.63 10.45 10.45 0 0 1-9.34 6.07zm5.7-7.8c-.3-.15-1.85-.92-2.13-1-.3-.1-.5-.15-.7.15s-.8 1-1 1.22-.35.25-.66.1a8.4 8.4 0 0 1-2.47-1.52 9.17 9.17 0 0 1-1.7-2.12c-.18-.3-.02-.47.13-.62s.3-.35.45-.52.2-.3.3-.5a.6.6 0 0 0 0-.57c0-.1-.7-1.7-.96-2.32-.25-.6-.5-.53-.7-.53H5.5a1.33 1.33 0 0 0-1 .45 5.56 5.56 0 0 0-1.72 4.14 9.65 9.65 0 0 0 2 5.15c.15.2 3.3 5.05 8 7.1a15.8 15.8 0 0 0 5.4 2 1.4 1.4 0 0 0 1.2-.1 3.2 3.2 0 0 0 2-2.24c.15-.82.05-1.43-.05-1.6s-.4-.25-.7-.4z"/></>
+            'sticky-note': <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></>
         };
 
         const Icon = ({ name, size = 20, className, ...props }) => {
             const content = ICON_PATHS[name];
             if (!content) return null;
-            return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="currentColor" stroke="none" className={className} {...props}>{content}</svg>;
-        };
-
-        const LineIcon = ({ name, size = 20, className, ...props }) => {
-            const content = ICON_PATHS[name];
-             if (!content) return null;
             return <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>{content}</svg>;
         };
 
-
         const Icons = {
-            Trash2: (p) => <LineIcon name="trash-2" {...p} />,
-            PlusCircle: (p) => <LineIcon name="plus-circle" {...p} />,
-            User: (p) => <LineIcon name="user" {...p} />,
-            Building2: (p) => <LineIcon name="building-2" {...p} />,
-            Wallet: (p) => <LineIcon name="wallet" {...p} />,
-            Download: (p) => <LineIcon name="download" {...p} />,
-            Cloud: (p) => <LineIcon name="cloud" {...p} />,
-            Search: (p) => <LineIcon name="search" {...p} />,
-            CheckCircle2: (p) => <LineIcon name="check-circle-2" {...p} />,
-            Clock: (p) => <LineIcon name="clock" {...p} />,
-            Pencil: (p) => <LineIcon name="pencil" {...p} />,
-            X: (p) => <LineIcon name="x" {...p} />,
-            Save: (p) => <LineIcon name="save" {...p} />,
-            AlertCircle: (p) => <LineIcon name="alert-circle" {...p} />,
-            Ticket: (p) => <LineIcon name="ticket" {...p} />,
-            Printer: (p) => <LineIcon name="printer" {...p} />,
-            ImageIcon: (p) => <LineIcon name="image" {...p} />,
-            LayoutDashboard: (p) => <LineIcon name="layout-dashboard" {...p} />,
-            List: (p) => <LineIcon name="list" {...p} />,
-            Paperclip: (p) => <LineIcon name="paperclip" {...p} />,
-            Lock: (p) => <LineIcon name="lock" {...p} />,
-            LogIn: (p) => <LineIcon name="log-in" {...p} />,
-            History: (p) => <LineIcon name="history" {...p} />,
-            FileText: (p) => <LineIcon name="file-text" {...p} />,
-            Moon: (p) => <LineIcon name="moon" {...p} />,
-            Sun: (p) => <LineIcon name="sun" {...p} />,
-            RotateCcw: (p) => <LineIcon name="rotate-ccw" {...p} />,
-            Ban: (p) => <LineIcon name="ban" {...p} />,
-            TrendingUp: (p) => <LineIcon name="trending-up" {...p} />,
-            Package: (p) => <LineIcon name="package" {...p} />,
-            Phone: (p) => <LineIcon name="phone" {...p} />,
-            Filter: (p) => <LineIcon name="filter" {...p} />,
-            Smartphone: (p) => <LineIcon name="smartphone" {...p} />,
-            CalendarCheck: (p) => <LineIcon name="calendar-check" {...p} />,
-            StickyNote: (p) => <LineIcon name="sticky-note" {...p} />,
-            BrandWhatsapp: (p) => <Icon name="brand-whatsapp" viewBox="0 0 28 28" {...p} />
+            Trash2: (p) => <Icon name="trash-2" {...p} />,
+            PlusCircle: (p) => <Icon name="plus-circle" {...p} />,
+            User: (p) => <Icon name="user" {...p} />,
+            Building2: (p) => <Icon name="building-2" {...p} />,
+            Wallet: (p) => <Icon name="wallet" {...p} />,
+            Download: (p) => <Icon name="download" {...p} />,
+            Cloud: (p) => <Icon name="cloud" {...p} />,
+            Search: (p) => <Icon name="search" {...p} />,
+            CheckCircle2: (p) => <Icon name="check-circle-2" {...p} />,
+            Clock: (p) => <Icon name="clock" {...p} />,
+            Pencil: (p) => <Icon name="pencil" {...p} />,
+            X: (p) => <Icon name="x" {...p} />,
+            Save: (p) => <Icon name="save" {...p} />,
+            AlertCircle: (p) => <Icon name="alert-circle" {...p} />,
+            Ticket: (p) => <Icon name="ticket" {...p} />,
+            Printer: (p) => <Icon name="printer" {...p} />,
+            ImageIcon: (p) => <Icon name="image" {...p} />,
+            LayoutDashboard: (p) => <Icon name="layout-dashboard" {...p} />,
+            List: (p) => <Icon name="list" {...p} />,
+            Paperclip: (p) => <Icon name="paperclip" {...p} />,
+            Lock: (p) => <Icon name="lock" {...p} />,
+            LogIn: (p) => <Icon name="log-in" {...p} />,
+            History: (p) => <Icon name="history" {...p} />,
+            FileText: (p) => <Icon name="file-text" {...p} />,
+            Moon: (p) => <Icon name="moon" {...p} />,
+            Sun: (p) => <Icon name="sun" {...p} />,
+            RotateCcw: (p) => <Icon name="rotate-ccw" {...p} />,
+            Ban: (p) => <Icon name="ban" {...p} />,
+            TrendingUp: (p) => <Icon name="trending-up" {...p} />,
+            Package: (p) => <Icon name="package" {...p} />,
+            Phone: (p) => <Icon name="phone" {...p} />,
+            Filter: (p) => <Icon name="filter" {...p} />,
+            Smartphone: (p) => <Icon name="smartphone" {...p} />,
+            CalendarCheck: (p) => <Icon name="calendar-check" {...p} />,
+            StickyNote: (p) => <Icon name="sticky-note" {...p} />
         };
 
         function MainApp() {
@@ -227,8 +205,8 @@
             const [deleteConfirmId, setDeleteConfirmId] = useState(null);
             const [permanentDeleteId, setPermanentDeleteId] = useState(null);
             const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
-            const [officeStatsMode, setOfficeStatsMode] = useState('total'); 
-            const [staffStatsMode, setStaffStatsMode] = useState('total');
+            const [officeStatsMode, setOfficeStatsMode] = useState('total'); // 'total' or 'daily' or 'monthly'
+            const [staffStatsMode, setStaffStatsMode] = useState('total'); // 'total' or 'daily' or 'monthly'
 
             const [calendarDate, setCalendarDate] = useState(new Date());
             const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
@@ -329,36 +307,12 @@
                 reader.readAsDataURL(file);
             };
 
-            const sendManagerWhatsapp = (officeName, customerName, amount) => {
-                const rawPhone = OFFICE_PHONES[officeName];
-                if (!rawPhone) {
-                    alert(`${officeName} ofisi için müdür telefonu tanımlı değil.`);
-                    return;
-                }
-                // Sanitize phone
-                let phone = rawPhone.replace(/\D/g, '');
-                if (phone.startsWith('0')) { phone = phone.substring(1); }
-                if (phone.length === 10) { phone = '90' + phone; }
-                
-                const message = `Bilgilendirme: ${customerName} isimli müşteriden ${formatCurrency(amount).replace('₺', 'TL')} peşinat ödemesi alınmıştır.`;
-                
-                const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-                window.open(url, '_blank');
-            };
-
             const handleSubmit = async (e) => {
                 e.preventDefault();
                 if (!formData.staffName || !formData.amount) return;
                 try {
                     const newEntry = { ...formData, amount: parseFloat(formData.amount), status: 'Teslim Edilmedi', history: [], createdAt: new Date().toISOString(), createdBy: user.email, isDeleted: false };
                     await addDoc(collection(db, DB_COLLECTION), newEntry);
-                    
-                    if(OFFICE_PHONES[formData.office]) {
-                        if(confirm(`Kayıt Başarılı.\n${formData.office} ofis müdürüne bildirim gönderilsin mi?`)) {
-                            sendManagerWhatsapp(formData.office, formData.customerName, formData.amount);
-                        }
-                    }
-
                     const currentNo = parseInt(formData.receiptNo || "0", 10);
                     const nextNo = (currentNo + 1).toString().padStart(6, '0');
                     setFormData({ receiptNo: nextNo, date: formData.date, staffName: '', office: '', customerName: '', customerPhone: '', amount: '', image: null, note: '' });
@@ -395,7 +349,7 @@
                     const oldData = editingItem.original;
                     const newData = editingItem;
                     const formatDate = (d) => new Date(d).toLocaleDateString('tr-TR');
-                    
+
                     if (oldData.receiptNo !== newData.receiptNo) changes.push(`Makbuz: ${oldData.receiptNo} -> ${newData.receiptNo}`);
                     if (oldData.date !== newData.date) changes.push(`Tarih: ${formatDate(oldData.date)} -> ${formatDate(newData.date)}`);
                     if (parseFloat(oldData.amount) !== parseFloat(newData.amount)) changes.push(`Tutar: ${formatCurrency(oldData.amount)} -> ${formatCurrency(newData.amount)}`);
@@ -405,40 +359,28 @@
                     if (oldData.office !== newData.office) changes.push(`Ofis: ${oldData.office} -> ${newData.office}`);
                     if (oldData.status !== newData.status) changes.push(`Durum: ${oldData.status} -> ${newData.status}`);
                     if ((oldData.note || '') !== (newData.note || '')) changes.push(`Not düzenlendi`);
-
+                    
                     const actionText = changes.length > 0 ? changes.join(', ') : 'Düzenleme yapıldı';
                     const historyEntry = { updatedAt: new Date().toISOString(), action: actionText, user: user.email };
                     
                     const updateData = { ...editingItem, amount: parseFloat(editingItem.amount), history: [...(editingItem.history || []), historyEntry] };
                     delete updateData.original;
+
                     await updateDoc(doc(db, DB_COLLECTION, editingItem.id), updateData);
                     setEditingItem(null);
                 } catch (error) { alert("Güncellenemedi: " + error.message); }
             };
 
-            const toggleStatus = async (entry) => {
+            const toggleStatus = async (entry) => { 
                 if (!isAdmin) return;
+                
                 const nextStatus = entry.status === 'Teslim Edildi' ? 'Teslim Edilmedi' : 'Teslim Edildi';
                 if (!window.confirm(`"${entry.customerName}" adlı müşterinin durumunu "${nextStatus}" olarak değiştirmek istediğinize emin misiniz?`)) return;
+
                 try {
                     const historyEntry = { updatedAt: new Date().toISOString(), action: 'Durum Değişti: ' + nextStatus, user: user.email };
                     await updateDoc(doc(db, DB_COLLECTION, entry.id), { status: nextStatus, history: [...(entry.history || []), historyEntry] });
                 } catch (error) { console.error(error); }
-            };
-
-            const sendWhatsapp = (entry) => {
-                if (!entry.customerPhone) {
-                    alert("Bu müşterinin telefon numarası kayıtlı değil.");
-                    return;
-                }
-                let phone = entry.customerPhone.replace(/\D/g, '');
-                if (phone.startsWith('0')) { phone = phone.substring(1); }
-                if (phone.length === 10) { phone = '90' + phone; }
-                const formattedDate = new Date(entry.date).toLocaleDateString('tr-TR');
-                const formattedAmount = formatCurrency(entry.amount).replace('₺', 'TL');
-                const message = `Sayın ${entry.customerName}, ${formattedDate} tarihli ${formattedAmount} tutarındaki peşinat ödemeniz alınmıştır. Makbuz No: ${entry.receiptNo}. Teşekkür ederiz.`;
-                const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-                window.open(url, '_blank');
             };
 
             const generatePDF = (entry) => {
@@ -571,7 +513,6 @@
                 };
             }, [entries]);
 
-            // ... (Calendar logic same as before) ...
             const getCalendarDays = (year, month) => {
                 const firstDay = new Date(year, month, 1);
                 const lastDay = new Date(year, month + 1, 0);
@@ -584,22 +525,24 @@
                 for (let i = 1; i <= daysInMonth; i++) days.push(i);
                 return days;
             };
+
             const changeMonth = (increment) => {
                 const newDate = new Date(calendarDate);
                 newDate.setMonth(newDate.getMonth() + increment);
                 setCalendarDate(newDate);
                 setSelectedCalendarDate(null);
             };
+
             const getDailyTransactions = (dateStr) => {
                 return entries.filter(e => !e.isDeleted && e.date === dateStr);
             };
+
             const getDayTotal = (day) => {
                 if (!day) return 0;
                 const dateStr = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day + 1).toISOString().split('T')[0];
                 return getDailyTransactions(dateStr).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
             };
 
-            // ... (UI parts) ...
             if (!user) {
                 return (
                     <div className={`min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4 transition-colors duration-300`}>
@@ -620,13 +563,12 @@
 
             return (
                 <div className={`min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-4 md:p-8 relative transition-colors duration-300`}>
-                   {/* ... Modals (same as before) ... */}
-                   {deleteConfirmId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full"><h3 className="text-lg font-bold text-slate-900 dark:text-white text-center">Çöp Kutusuna Taşı?</h3><p className="text-slate-500 dark:text-slate-400 mt-1 text-sm text-center">Bu kaydı daha sonra geri yükleyebilirsiniz.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setDeleteConfirmId(null)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-200">İptal</button><button onClick={confirmSoftDelete} className="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700">Sil</button></div></div></div>)}
-                   {permanentDeleteId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full border-2 border-red-500"><h3 className="text-lg font-bold text-red-600 text-center">DİKKAT: KALICI SİLME!</h3><p className="text-slate-500 dark:text-slate-400 mt-1 text-sm text-center">Bu işlem geri alınamaz. Kayıt tamamen yok olacak.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setPermanentDeleteId(null)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-200">Vazgeç</button><button onClick={confirmPermanentDelete} className="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-bold">KALICI SİL</button></div></div></div>)}
-                   {imagePreviewUrl && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setImagePreviewUrl(null)}><div className="bg-white dark:bg-slate-800 p-2 rounded-lg max-w-3xl max-h-[90vh] overflow-auto"><img src={imagePreviewUrl} alt="Dekont" className="max-w-full h-auto rounded" /><div className="text-center mt-2 text-sm text-slate-500 dark:text-slate-400">Kapatmak için dışarı tıklayın</div></div></div>)}
-                   {editingItem && (
+                    {deleteConfirmId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full"><h3 className="text-lg font-bold text-slate-900 dark:text-white text-center">Çöp Kutusuna Taşı?</h3><p className="text-slate-500 dark:text-slate-400 mt-1 text-sm text-center">Bu kaydı daha sonra geri yükleyebilirsiniz.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setDeleteConfirmId(null)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-200">İptal</button><button onClick={confirmSoftDelete} className="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700">Sil</button></div></div></div>)}
+                    {permanentDeleteId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full border-2 border-red-500"><h3 className="text-lg font-bold text-red-600 text-center">DİKKAT: KALICI SİLME!</h3><p className="text-slate-500 dark:text-slate-400 mt-1 text-sm text-center">Bu işlem geri alınamaz. Kayıt tamamen yok olacak.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setPermanentDeleteId(null)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-200">Vazgeç</button><button onClick={confirmPermanentDelete} className="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-bold">KALICI SİL</button></div></div></div>)}
+                    {imagePreviewUrl && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setImagePreviewUrl(null)}><div className="bg-white dark:bg-slate-800 p-2 rounded-lg max-w-3xl max-h-[90vh] overflow-auto"><img src={imagePreviewUrl} alt="Dekont" className="max-w-full h-auto rounded" /><div className="text-center mt-2 text-sm text-slate-500 dark:text-slate-400">Kapatmak için dışarı tıklayın</div></div></div>)}
+                    
+                    {editingItem && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
-                             {/* ... Editing modal content (same as before) ... */}
                             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl my-8 border dark:border-slate-700">
                                 <div className="flex items-center justify-between p-6 border-b border-slate-100 dark:border-slate-700"><h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2"><Icons.Pencil className={`w-5 h-5 text-${themeColor}-600`} /> Kaydı Düzenle</h3><button onClick={() => setEditingItem(null)}><Icons.X className="w-6 h-6 text-slate-400" /></button></div>
                                 <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -696,9 +638,98 @@
                             </div>
                         </div>
 
-                    {/* ... (Dashboard, Calendar, Trash sections same as before) ... */}
-                    
-                    {viewMode === 'dashboard' && (
+                        {viewMode === 'calendar' && (
+                            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h3 className="font-bold text-slate-700 dark:text-slate-200 text-xl flex items-center gap-2">
+                                            <Icons.CalendarCheck className={`w-6 h-6 text-${themeColor}-500`} /> 
+                                            {calendarDate.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+                                        </h3>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => changeMonth(-1)} className="px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 font-bold">←</button>
+                                            <button onClick={() => { setCalendarDate(new Date()); setSelectedCalendarDate(null); }} className="px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 text-sm">Bugün</button>
+                                            <button onClick={() => changeMonth(1)} className="px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 font-bold">→</button>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Gün Başlıkları */}
+                                    <div className="grid grid-cols-7 gap-2 mb-2 text-center">
+                                        {['Pt', 'Sa', 'Ça', 'Pe', 'Cu', 'Ct', 'Pa'].map(d => (
+                                            <div key={d} className="text-xs font-bold text-slate-400 uppercase">{d}</div>
+                                        ))}
+                                    </div>
+
+                                    {/* Takvim Grid */}
+                                    <div className="grid grid-cols-7 gap-2">
+                                        {getCalendarDays(calendarDate.getFullYear(), calendarDate.getMonth()).map((day, i) => {
+                                            if (day === null) return <div key={i} className="h-24 bg-transparent"></div>;
+                                            
+                                            const total = getDayTotal(day);
+                                            const currentDateStr = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day + 1).toISOString().split('T')[0]; // +1 for timezone fix locally
+                                            const isSelected = selectedCalendarDate === currentDateStr;
+                                            
+                                            return (
+                                                <button 
+                                                    key={i} 
+                                                    onClick={() => {
+                                                        if (total > 0) setSelectedCalendarDate(currentDateStr);
+                                                        else setSelectedCalendarDate(null);
+                                                    }}
+                                                    className={`h-24 rounded-lg border flex flex-col items-center justify-center relative transition-all
+                                                        ${isSelected ? `border-${themeColor}-500 ring-2 ring-${themeColor}-200 dark:ring-${themeColor}-900` : 'border-slate-100 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}
+                                                        ${total > 0 ? `bg-${themeColor}-50 dark:bg-${themeColor}-900/20 cursor-pointer` : 'bg-white dark:bg-slate-800/50 cursor-default'}
+                                                    `}
+                                                >
+                                                    <span className={`text-lg font-bold ${total > 0 ? `text-${themeColor}-700 dark:text-${themeColor}-300` : 'text-slate-400 dark:text-slate-600'}`}>{day}</span>
+                                                    {total > 0 && (
+                                                        <div className={`mt-1 text-xs font-bold px-2 py-1 rounded-full bg-${themeColor}-100 dark:bg-${themeColor}-900 text-${themeColor}-700 dark:text-${themeColor}-300`}>
+                                                            {formatCurrency(total).replace(',00', '')}
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+
+                                {/* Gün Detayları */}
+                                {selectedCalendarDate && (
+                                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm animate-in fade-in slide-in-from-top-4">
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="font-bold text-slate-700 dark:text-slate-200 text-lg">
+                                                {new Date(selectedCalendarDate).toLocaleDateString('tr-TR')} Tarihli İşlemler
+                                            </h3>
+                                            <button onClick={() => setSelectedCalendarDate(null)} className="text-slate-400 hover:text-slate-600"><Icons.X className="w-5 h-5" /></button>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead>
+                                                    <tr className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-400 text-xs uppercase">
+                                                        <th className="p-3">Personel</th>
+                                                        <th className="p-3">Ofis</th>
+                                                        <th className="p-3">Müşteri</th>
+                                                        <th className="p-3 text-right">Tutar</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                                    {getDailyTransactions(selectedCalendarDate).map(entry => (
+                                                        <tr key={entry.id}>
+                                                            <td className="p-3 text-sm text-slate-700 dark:text-slate-300">{entry.staffName}</td>
+                                                            <td className="p-3 text-sm text-slate-500 dark:text-slate-400">{entry.office}</td>
+                                                            <td className="p-3 text-sm text-slate-700 dark:text-slate-300 font-medium">{entry.customerName}</td>
+                                                            <td className="p-3 text-sm text-right font-mono font-bold text-slate-700 dark:text-slate-300">{formatCurrency(entry.amount)}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {viewMode === 'dashboard' && (
                             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className={`bg-gradient-to-br from-${themeColor}-500 to-${themeColor}-600 rounded-xl p-6 text-white shadow-lg shadow-${themeColor}-200 dark:shadow-none`}>
@@ -876,7 +907,7 @@
                             </div>
                         )}
 
-                    {viewMode === 'trash' && isAdmin && (
+                        {viewMode === 'trash' && isAdmin && (
                             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden animate-in fade-in">
                                 <div className="p-4 bg-red-50 dark:bg-red-900/20 border-b border-red-100 dark:border-red-900/30 flex justify-between items-center">
                                     <h2 className="font-bold text-red-700 dark:text-red-400 flex items-center gap-2"><Icons.Trash2 className="w-5 h-5" /> Çöp Kutusu</h2>
@@ -938,6 +969,7 @@
                                         <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tutar (TL)</label><input type="number" name="amount" placeholder="0.00" value={formData.amount} onChange={(e) => setFormData(p => ({...p, amount: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-green-500 font-mono dark:bg-slate-900" required /></div>
                                         <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1"><Icons.Paperclip className="w-3 h-3" /> Dekont</label><input type="file" ref={fileInputRef} accept="image/*" onChange={(e) => handleImageUpload(e.target.files[0], (base64) => setFormData(p => ({...p, image: base64})))} className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-50 dark:bg-slate-700 file:text-blue-700 dark:text-blue-300"/></div>
                                         
+                                        {/* NOT ALANI (EKLEME) */}
                                         <div className="lg:col-span-7 mt-2">
                                             <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1 mb-1"><Icons.StickyNote className="w-3 h-3" /> Açıklama / Not</label>
                                             <textarea 
@@ -1005,8 +1037,7 @@
                                                                         </div>
                                                                     </div>}
                                                                 </div>
-                                                                {/* Small phone icon removed here */}
-                                                                {entry.customerPhone && <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5">{entry.customerPhone}</div>}
+                                                                {entry.customerPhone && <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-0.5"><Icons.Phone className="w-3 h-3"/> {entry.customerPhone}</div>}
                                                             </td>
                                                             <td className="p-4 text-center">{entry.image && (<button onClick={() => setImagePreviewUrl(entry.image)} className={`text-slate-400 hover:text-${themeColor}-600 transition-colors`} title="Dekontu Gör"><Icons.ImageIcon className="w-5 h-5" /></button>)}</td>
                                                             <td className="p-4 text-center"><button onClick={() => toggleStatus(entry)} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold border ${isDelivered ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-200' : 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100'} ${!isAdmin ? 'cursor-not-allowed opacity-70' : ''}`} disabled={!isAdmin}>{isDelivered ? <Icons.CheckCircle2 className="w-3 h-3" /> : <Icons.Clock className="w-3 h-3" />} {entry.status || 'Bekliyor'}</button></td>
@@ -1015,20 +1046,6 @@
                                                                 <div className="flex items-center justify-center gap-1">
                                                                     <button onClick={() => printReceipt(entry)} className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="Hızlı Yazdır"><Icons.Printer className="w-4 h-4" /></button>
                                                                     <button onClick={() => generatePDF(entry)} className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20" title="PDF Olarak İndir"><Icons.FileText className="w-4 h-4" /></button>
-                                                                    <button onClick={() => sendWhatsapp(entry)} className="text-green-500 hover:text-green-700 dark:text-green-400 dark:hover:text-green-300 p-1.5 rounded hover:bg-green-50 dark:hover:bg-green-900/20" title="Müşteriye WhatsApp ile Gönder"><Icons.BrandWhatsapp className="w-4 h-4" /></button>
-                                                                    {isAdmin && OFFICE_PHONES[entry.office] && (
-                                                                        <button 
-                                                                            onClick={() => {
-                                                                                if(confirm(`${entry.office} ofis müdürüne bildirim gönderilsin mi?`)) {
-                                                                                    sendManagerWhatsapp(entry.office, entry.customerName, entry.amount);
-                                                                                }
-                                                                            }} 
-                                                                            className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 p-1.5 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20" 
-                                                                            title="Ofis Müdürüne Bildir"
-                                                                        >
-                                                                            <Icons.Phone className="w-4 h-4" />
-                                                                        </button>
-                                                                    )}
                                                                     {isAdmin && (
                                                                         <>
                                                                             <button onClick={() => setEditingItem({...entry, original: {...entry}})} className={`text-${themeColor}-400 hover:text-${themeColor}-600 dark:text-${themeColor}-400 dark:hover:text-${themeColor}-300 p-1.5 rounded hover:bg-${themeColor}-100 dark:hover:bg-${themeColor}-900/20`} title="Düzenle"><Icons.Pencil className="w-4 h-4" /></button>
@@ -1058,4 +1075,3 @@
     </script>
 </body>
 </html>
-
