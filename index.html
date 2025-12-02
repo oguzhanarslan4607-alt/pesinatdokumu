@@ -62,31 +62,11 @@
 
     <div id="root"></div>
 
-    <!-- PWA YAPILANDIRMASI -->
+    <!-- HATA YAKALAYICI -->
     <script>
-        const manifest = {
-            "name": "Peşinat Takip Sistemi",
-            "short_name": "Peşinat",
-            "start_url": ".",
-            "display": "standalone",
-            "background_color": "#ffffff",
-            "theme_color": "#2563eb",
-            "orientation": "any",
-            "icons": [
-                { "src": "https://cdn-icons-png.flaticon.com/512/2942/2942544.png", "sizes": "192x192", "type": "image/png" },
-                { "src": "https://cdn-icons-png.flaticon.com/512/2942/2942544.png", "sizes": "512x512", "type": "image/png" }
-            ]
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error("Hata:", message, error);
         };
-        const content = encodeURIComponent(JSON.stringify(manifest));
-        const url = "data:application/manifest+json," + content;
-        const link = document.createElement('link');
-        link.rel = 'manifest'; link.href = url; document.head.appendChild(link);
-
-        if ('serviceWorker' in navigator) {
-            const swCode = `self.addEventListener('install', (e) => self.skipWaiting()); self.addEventListener('fetch', (e) => {});`;
-            const blob = new Blob([swCode], {type: 'application/javascript'});
-            navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(err => console.log(err));
-        }
     </script>
 
     <script type="text/babel" data-type="module">
@@ -94,6 +74,8 @@
         import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
+        // =================================================================
+        // --- AYARLAR ---
         const firebaseConfig = {
             apiKey: "AIzaSyDEGpqDzFjMMJxqey1nG5kWearDmZsSNao",
             authDomain: "pesinatdokumu.firebaseapp.com",
@@ -104,8 +86,16 @@
             measurementId: "G-XX93ZSFYK2"
         };
 
-        const ADMIN_EMAILS = ["admin@demo.com", "yonetici@sirket.com", "oguzhanarslan4607@gmail.com"]; 
-        const OFFICES = ["Asena", "Asrın", "Dağıtım", "Efsane", "Elbistan", "Merkez Aktif", "Star"];
+        const ADMIN_EMAILS = [
+            "admin@demo.com", 
+            "yonetici@sirket.com",
+            "oguzhanarslan4607@gmail.com"
+        ]; 
+
+        const OFFICES = [
+            "Asena", "Asrın", "Dağıtım", "Efsane", "Elbistan", "Merkez Aktif", "Star"
+        ];
+        // =================================================================
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
@@ -215,6 +205,7 @@
             const [deleteConfirmId, setDeleteConfirmId] = useState(null);
             const [permanentDeleteId, setPermanentDeleteId] = useState(null);
             const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+            const [officeStatsMode, setOfficeStatsMode] = useState('total'); // 'total' or 'daily'
 
             const [calendarDate, setCalendarDate] = useState(new Date());
             const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
@@ -381,10 +372,13 @@
 
             const toggleStatus = async (entry) => { 
                 if (!isAdmin) return;
+                
+                const nextStatus = entry.status === 'Teslim Edildi' ? 'Teslim Edilmedi' : 'Teslim Edildi';
+                if (!window.confirm(`"${entry.customerName}" adlı müşterinin durumunu "${nextStatus}" olarak değiştirmek istediğinize emin misiniz?`)) return;
+
                 try {
-                    const newStatus = entry.status === 'Teslim Edildi' ? 'Teslim Edilmedi' : 'Teslim Edildi'; 
-                    const historyEntry = { updatedAt: new Date().toISOString(), action: 'Durum Değişti: ' + newStatus, user: user.email };
-                    await updateDoc(doc(db, DB_COLLECTION, entry.id), { status: newStatus, history: [...(entry.history || []), historyEntry] });
+                    const historyEntry = { updatedAt: new Date().toISOString(), action: 'Durum Değişti: ' + nextStatus, user: user.email };
+                    await updateDoc(doc(db, DB_COLLECTION, entry.id), { status: nextStatus, history: [...(entry.history || []), historyEntry] });
                 } catch (error) { console.error(error); }
             };
 
@@ -463,6 +457,7 @@
                 const pendingAmount = pendingEntries.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
                 const totalCount = activeEntries.length || 1;
                 const deliveryRate = Math.round((deliveredCount / totalCount) * 100);
+
                 const last7Days = [];
                 for (let i = 6; i >= 0; i--) {
                     const d = new Date(); d.setDate(d.getDate() - i); const dStr = d.toISOString().split('T')[0];
@@ -470,10 +465,20 @@
                     last7Days.push({ date: d.toLocaleDateString('tr-TR', {day: 'numeric', month: 'short'}), amount: dayAmount, rawDate: dStr });
                 }
                 const maxDayAmount = Math.max(...last7Days.map(d => d.amount)) || 1;
-                const officeStats = {}; activeEntries.forEach(e => { const office = e.office || 'Belirtilmemiş'; officeStats[office] = (officeStats[office] || 0) + (parseFloat(e.amount) || 0); });
+
+                const officeStats = {}; 
+                const dailyOfficeStats = {};
+
+                activeEntries.forEach(e => { 
+                    const office = e.office || 'Belirtilmemiş'; 
+                    officeStats[office] = (officeStats[office] || 0) + (parseFloat(e.amount) || 0); 
+                    if (e.date === todayStr) {
+                        dailyOfficeStats[office] = (dailyOfficeStats[office] || 0) + (parseFloat(e.amount) || 0);
+                    }
+                });
                 const staffStats = {}; activeEntries.forEach(e => { staffStats[e.staffName] = (staffStats[e.staffName] || 0) + (parseFloat(e.amount) || 0); });
                 const sortedStaff = Object.entries(staffStats).sort(([,a], [,b]) => b - a).slice(0, 5);
-                return { totalRevenue, monthlyRevenue, dailyRevenue, deliveryStats: { deliveredCount, pendingCount, deliveryRate, deliveredAmount, pendingAmount }, last7Days, maxDayAmount, officeStats, sortedStaff };
+                return { totalRevenue, monthlyRevenue, dailyRevenue, deliveryStats: { deliveredCount, pendingCount, deliveryRate, deliveredAmount, pendingAmount }, last7Days, maxDayAmount, officeStats, dailyOfficeStats, sortedStaff };
             }, [entries]);
 
             const getCalendarDays = (year, month) => {
@@ -549,18 +554,10 @@
                                         </select>
                                     </div>
                                     <div className="space-y-2"><label className="text-sm font-semibold">Durum</label><select value={editingItem.status} onChange={(e) => setEditingItem(p => ({...p, status: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900"><option value="Teslim Edilmedi">Teslim Edilmedi</option><option value="Teslim Edildi">Teslim Edildi</option></select></div>
-                                    
-                                    {/* NOT ALANI EKLENDİ (DÜZENLEME) */}
                                     <div className="col-span-1 md:col-span-2">
                                         <label className="text-sm font-semibold">Açıklama / Not</label>
-                                        <textarea 
-                                            value={editingItem.note || ''} 
-                                            onChange={(e) => setEditingItem(p => ({...p, note: e.target.value}))} 
-                                            className="w-full p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900 h-20 resize-none"
-                                            placeholder="İşlem ile ilgili notlar..."
-                                        ></textarea>
+                                        <textarea value={editingItem.note || ''} onChange={(e) => setEditingItem(p => ({...p, note: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900 h-20 resize-none" placeholder="İşlem ile ilgili notlar..."></textarea>
                                     </div>
-
                                     <div className="col-span-1 md:col-span-2 mt-4 border-t border-slate-100 dark:border-slate-700 pt-4">
                                         <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2"><Icons.History className="w-4 h-4" /> İşlem Geçmişi</h4>
                                         {editingItem.history && editingItem.history.length > 0 ? (
@@ -780,8 +777,48 @@
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                                        <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2"><Icons.Building2 className="w-5 h-5 text-slate-400" /> Ofis Performansı</h3>
-                                        <div className="space-y-3">{Object.entries(stats.officeStats).map(([office, amount]) => (<div key={office}><div className="flex justify-between text-sm mb-1"><span className="font-medium text-slate-700 dark:text-slate-300">{office}</span><span className="text-slate-500 dark:text-slate-400">{formatCurrency(amount)}</span></div><div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5"><div className={`bg-${themeColor}-500 h-2.5 rounded-full`} style={{ width: `${(amount / stats.totalRevenue) * 100}%` }}></div></div></div>))}</div>
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2"><Icons.Building2 className="w-5 h-5 text-slate-400" /> Ofis Performansı</h3>
+                                            <div className="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded p-1">
+                                                <button 
+                                                    onClick={() => setOfficeStatsMode('total')} 
+                                                    className={`text-xs px-2 py-1 rounded transition-colors ${officeStatsMode === 'total' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                                                >
+                                                    Genel
+                                                </button>
+                                                <button 
+                                                    onClick={() => setOfficeStatsMode('daily')} 
+                                                    className={`text-xs px-2 py-1 rounded transition-colors ${officeStatsMode === 'daily' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                                                >
+                                                    Bugün
+                                                </button>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-3">
+                                            {Object.entries(officeStatsMode === 'total' ? stats.officeStats : stats.dailyOfficeStats).length > 0 ? (
+                                                Object.entries(officeStatsMode === 'total' ? stats.officeStats : stats.dailyOfficeStats).map(([office, amount]) => (
+                                                    <div key={office}>
+                                                        <div className="flex justify-between text-sm mb-1">
+                                                            <span className="font-medium text-slate-700 dark:text-slate-300">{office}</span>
+                                                            <span className="text-slate-500 dark:text-slate-400">{formatCurrency(amount)}</span>
+                                                        </div>
+                                                        <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2.5">
+                                                            <div 
+                                                                className={`bg-${themeColor}-500 h-2.5 rounded-full`} 
+                                                                style={{ 
+                                                                    width: `${(amount / (officeStatsMode === 'total' ? stats.totalRevenue : stats.dailyRevenue)) * 100}%` 
+                                                                }}
+                                                            ></div>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="text-center text-sm text-slate-400 py-4">
+                                                    {officeStatsMode === 'daily' ? 'Bugün henüz işlem yok.' : 'Veri bulunamadı.'}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                                         <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2"><Icons.User className="w-5 h-5 text-slate-400" /> En İyi 5 Personel</h3>
@@ -852,8 +889,6 @@
                                         <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Telefon</label><input type="tel" name="customerPhone" placeholder="05XX..." value={formData.customerPhone} onChange={(e) => setFormData(p => ({...p, customerPhone: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" /></div>
                                         <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tutar (TL)</label><input type="number" name="amount" placeholder="0.00" value={formData.amount} onChange={(e) => setFormData(p => ({...p, amount: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-green-500 font-mono dark:bg-slate-900" required /></div>
                                         <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1"><Icons.Paperclip className="w-3 h-3" /> Dekont</label><input type="file" ref={fileInputRef} accept="image/*" onChange={(e) => handleImageUpload(e.target.files[0], (base64) => setFormData(p => ({...p, image: base64})))} className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-50 dark:bg-slate-700 file:text-blue-700 dark:text-blue-300"/></div>
-                                        
-                                        {/* NOT ALANI (EKLEME) */}
                                         <div className="lg:col-span-7 mt-2">
                                             <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1 mb-1"><Icons.StickyNote className="w-3 h-3" /> Açıklama / Not</label>
                                             <textarea 
@@ -864,7 +899,6 @@
                                                 placeholder="İşlemle ilgili özel notlar..."
                                             ></textarea>
                                         </div>
-
                                         <div className="lg:col-span-7 flex justify-end mt-2"><button type="submit" className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-6 py-2 rounded-lg font-medium shadow-sm w-full md:w-auto flex justify-center items-center gap-2`}><Icons.PlusCircle className="w-4 h-4" /> Listeye Ekle</button></div>
                                     </form>
                                 </div>
