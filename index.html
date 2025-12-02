@@ -205,7 +205,8 @@
             const [deleteConfirmId, setDeleteConfirmId] = useState(null);
             const [permanentDeleteId, setPermanentDeleteId] = useState(null);
             const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
-            const [officeStatsMode, setOfficeStatsMode] = useState('total'); // 'total' or 'daily'
+            const [officeStatsMode, setOfficeStatsMode] = useState('total'); // 'total' or 'daily' or 'monthly'
+            const [staffStatsMode, setStaffStatsMode] = useState('total'); // 'total' or 'daily' or 'monthly'
 
             const [calendarDate, setCalendarDate] = useState(new Date());
             const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
@@ -468,17 +469,48 @@
 
                 const officeStats = {}; 
                 const dailyOfficeStats = {};
+                const monthlyOfficeStats = {};
+
+                const staffStats = {};
+                const dailyStaffStats = {};
+                const monthlyStaffStats = {};
 
                 activeEntries.forEach(e => { 
                     const office = e.office || 'Belirtilmemiş'; 
-                    officeStats[office] = (officeStats[office] || 0) + (parseFloat(e.amount) || 0); 
+                    const amount = parseFloat(e.amount) || 0;
+                    
+                    // Office Stats
+                    officeStats[office] = (officeStats[office] || 0) + amount; 
                     if (e.date === todayStr) {
-                        dailyOfficeStats[office] = (dailyOfficeStats[office] || 0) + (parseFloat(e.amount) || 0);
+                        dailyOfficeStats[office] = (dailyOfficeStats[office] || 0) + amount;
+                    }
+                    if (e.date.startsWith(currentMonth)) {
+                        monthlyOfficeStats[office] = (monthlyOfficeStats[office] || 0) + amount;
+                    }
+
+                    // Staff Stats
+                    staffStats[e.staffName] = (staffStats[e.staffName] || 0) + amount;
+                    if (e.date === todayStr) {
+                        dailyStaffStats[e.staffName] = (dailyStaffStats[e.staffName] || 0) + amount;
+                    }
+                    if (e.date.startsWith(currentMonth)) {
+                        monthlyStaffStats[e.staffName] = (monthlyStaffStats[e.staffName] || 0) + amount;
                     }
                 });
-                const staffStats = {}; activeEntries.forEach(e => { staffStats[e.staffName] = (staffStats[e.staffName] || 0) + (parseFloat(e.amount) || 0); });
-                const sortedStaff = Object.entries(staffStats).sort(([,a], [,b]) => b - a).slice(0, 5);
-                return { totalRevenue, monthlyRevenue, dailyRevenue, deliveryStats: { deliveredCount, pendingCount, deliveryRate, deliveredAmount, pendingAmount }, last7Days, maxDayAmount, officeStats, dailyOfficeStats, sortedStaff };
+
+                const sortStats = (statsObj) => Object.entries(statsObj).sort(([,a], [,b]) => b - a).slice(0, 5);
+                
+                const sortedStaffTotal = sortStats(staffStats);
+                const sortedStaffDaily = sortStats(dailyStaffStats);
+                const sortedStaffMonthly = sortStats(monthlyStaffStats);
+
+                return { 
+                    totalRevenue, monthlyRevenue, dailyRevenue, 
+                    deliveryStats: { deliveredCount, pendingCount, deliveryRate, deliveredAmount, pendingAmount }, 
+                    last7Days, maxDayAmount, 
+                    officeStats, dailyOfficeStats, monthlyOfficeStats,
+                    sortedStaffTotal, sortedStaffDaily, sortedStaffMonthly
+                };
             }, [entries]);
 
             const getCalendarDays = (year, month) => {
@@ -787,6 +819,12 @@
                                                     Genel
                                                 </button>
                                                 <button 
+                                                    onClick={() => setOfficeStatsMode('monthly')} 
+                                                    className={`text-xs px-2 py-1 rounded transition-colors ${officeStatsMode === 'monthly' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                                                >
+                                                    Aylık
+                                                </button>
+                                                <button 
                                                     onClick={() => setOfficeStatsMode('daily')} 
                                                     className={`text-xs px-2 py-1 rounded transition-colors ${officeStatsMode === 'daily' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
                                                 >
@@ -796,8 +834,8 @@
                                         </div>
                                         
                                         <div className="space-y-3">
-                                            {Object.entries(officeStatsMode === 'total' ? stats.officeStats : stats.dailyOfficeStats).length > 0 ? (
-                                                Object.entries(officeStatsMode === 'total' ? stats.officeStats : stats.dailyOfficeStats).map(([office, amount]) => (
+                                            {Object.entries(officeStatsMode === 'total' ? stats.officeStats : (officeStatsMode === 'daily' ? stats.dailyOfficeStats : stats.monthlyOfficeStats)).length > 0 ? (
+                                                Object.entries(officeStatsMode === 'total' ? stats.officeStats : (officeStatsMode === 'daily' ? stats.dailyOfficeStats : stats.monthlyOfficeStats)).map(([office, amount]) => (
                                                     <div key={office}>
                                                         <div className="flex justify-between text-sm mb-1">
                                                             <span className="font-medium text-slate-700 dark:text-slate-300">{office}</span>
@@ -807,7 +845,7 @@
                                                             <div 
                                                                 className={`bg-${themeColor}-500 h-2.5 rounded-full`} 
                                                                 style={{ 
-                                                                    width: `${(amount / (officeStatsMode === 'total' ? stats.totalRevenue : stats.dailyRevenue)) * 100}%` 
+                                                                    width: `${(amount / (officeStatsMode === 'total' ? stats.totalRevenue : (officeStatsMode === 'daily' ? stats.dailyRevenue : stats.monthlyRevenue))) * 100}%` 
                                                                 }}
                                                             ></div>
                                                         </div>
@@ -815,14 +853,55 @@
                                                 ))
                                             ) : (
                                                 <div className="text-center text-sm text-slate-400 py-4">
-                                                    {officeStatsMode === 'daily' ? 'Bugün henüz işlem yok.' : 'Veri bulunamadı.'}
+                                                    {officeStatsMode === 'daily' ? 'Bugün henüz işlem yok.' : (officeStatsMode === 'monthly' ? 'Bu ay henüz işlem yok.' : 'Veri bulunamadı.')}
                                                 </div>
                                             )}
                                         </div>
                                     </div>
                                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                                        <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-4 flex items-center gap-2"><Icons.User className="w-5 h-5 text-slate-400" /> En İyi 5 Personel</h3>
-                                        <div className="space-y-4">{stats.sortedStaff.map(([name, amount], index) => (<div key={name} className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>{index + 1}</div><div className="flex-1"><div className="text-sm font-medium text-slate-800 dark:text-slate-200">{name}</div><div className="text-xs text-slate-500 dark:text-slate-400">{formatCurrency(amount)}</div></div><div className={`text-${themeColor}-600 dark:text-${themeColor}-400 font-bold text-sm`}>%{Math.round((amount / stats.totalRevenue) * 100)}</div></div>))}</div>
+                                        <div className="flex justify-between items-center mb-4">
+                                            <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2"><Icons.User className="w-5 h-5 text-slate-400" /> En İyi 5 Personel</h3>
+                                            <div className="flex gap-1 bg-slate-100 dark:bg-slate-700 rounded p-1">
+                                                <button 
+                                                    onClick={() => setStaffStatsMode('total')} 
+                                                    className={`text-xs px-2 py-1 rounded transition-colors ${staffStatsMode === 'total' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                                                >
+                                                    Genel
+                                                </button>
+                                                <button 
+                                                    onClick={() => setStaffStatsMode('monthly')} 
+                                                    className={`text-xs px-2 py-1 rounded transition-colors ${staffStatsMode === 'monthly' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                                                >
+                                                    Aylık
+                                                </button>
+                                                <button 
+                                                    onClick={() => setStaffStatsMode('daily')} 
+                                                    className={`text-xs px-2 py-1 rounded transition-colors ${staffStatsMode === 'daily' ? 'bg-white dark:bg-slate-600 shadow text-slate-800 dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}
+                                                >
+                                                    Bugün
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4">
+                                            {(staffStatsMode === 'total' ? stats.sortedStaffTotal : (staffStatsMode === 'daily' ? stats.sortedStaffDaily : stats.sortedStaffMonthly)).length > 0 ? (
+                                                (staffStatsMode === 'total' ? stats.sortedStaffTotal : (staffStatsMode === 'daily' ? stats.sortedStaffDaily : stats.sortedStaffMonthly)).map(([name, amount], index) => (
+                                                <div key={name} className="flex items-center gap-3">
+                                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>{index + 1}</div>
+                                                    <div className="flex-1">
+                                                        <div className="text-sm font-medium text-slate-800 dark:text-slate-200">{name}</div>
+                                                        <div className="text-xs text-slate-500 dark:text-slate-400">{formatCurrency(amount)}</div>
+                                                    </div>
+                                                    <div className={`text-${themeColor}-600 dark:text-${themeColor}-400 font-bold text-sm`}>
+                                                        %{Math.round((amount / (staffStatsMode === 'total' ? stats.totalRevenue : (staffStatsMode === 'daily' ? stats.dailyRevenue : stats.monthlyRevenue))) * 100) || 0}
+                                                    </div>
+                                                </div>
+                                            ))
+                                            ) : (
+                                                <div className="text-center text-sm text-slate-400 py-4">
+                                                    {staffStatsMode === 'daily' ? 'Bugün henüz işlem yok.' : (staffStatsMode === 'monthly' ? 'Bu ay henüz işlem yok.' : 'Veri bulunamadı.')}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -889,6 +968,8 @@
                                         <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Telefon</label><input type="tel" name="customerPhone" placeholder="05XX..." value={formData.customerPhone} onChange={(e) => setFormData(p => ({...p, customerPhone: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" /></div>
                                         <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tutar (TL)</label><input type="number" name="amount" placeholder="0.00" value={formData.amount} onChange={(e) => setFormData(p => ({...p, amount: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-green-500 font-mono dark:bg-slate-900" required /></div>
                                         <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1"><Icons.Paperclip className="w-3 h-3" /> Dekont</label><input type="file" ref={fileInputRef} accept="image/*" onChange={(e) => handleImageUpload(e.target.files[0], (base64) => setFormData(p => ({...p, image: base64})))} className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-50 dark:bg-slate-700 file:text-blue-700 dark:text-blue-300"/></div>
+                                        
+                                        {/* NOT ALANI (EKLEME) */}
                                         <div className="lg:col-span-7 mt-2">
                                             <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1 mb-1"><Icons.StickyNote className="w-3 h-3" /> Açıklama / Not</label>
                                             <textarea 
@@ -899,6 +980,7 @@
                                                 placeholder="İşlemle ilgili özel notlar..."
                                             ></textarea>
                                         </div>
+
                                         <div className="lg:col-span-7 flex justify-end mt-2"><button type="submit" className={`bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white px-6 py-2 rounded-lg font-medium shadow-sm w-full md:w-auto flex justify-center items-center gap-2`}><Icons.PlusCircle className="w-4 h-4" /> Listeye Ekle</button></div>
                                     </form>
                                 </div>
