@@ -221,6 +221,12 @@
             const [isLoading, setIsLoading] = useState(true);
             const [viewMode, setViewMode] = useState('list');
             const [searchTerm, setSearchTerm] = useState('');
+			// --- SAYFALAMA AYARLARI ---
+            const [currentPage, setCurrentPage] = useState(1);
+            const [itemsPerPage, setItemsPerPage] = useState(50);
+
+            // Arama veya filtre değişirse ilk sayfaya dön
+            useEffect(() => { setCurrentPage(1); }, [searchTerm, dateFilter, statusFilter]);
             const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
             const [statusFilter, setStatusFilter] = useState('all');
             const [editingItem, setEditingItem] = useState(null);
@@ -509,6 +515,11 @@
             });
 
             const trashEntries = entries.filter(e => e.isDeleted);
+			// --- SAYFALAMA HESABI ---
+            const indexOfLastItem = currentPage * itemsPerPage;
+            const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+            const currentItems = filteredEntries.slice(indexOfFirstItem, indexOfLastItem);
+            const totalPages = Math.ceil(filteredEntries.length / itemsPerPage);
             const totalAmount = filteredEntries.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
             
             const stats = useMemo(() => {
@@ -1071,7 +1082,7 @@
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                            {filteredEntries.map((entry) => {
+                                            {currentItems.map((entry) => {	
                                                 const isDelivered = entry.status === 'Teslim Edildi';
                                                 return (
                                                     <tr key={entry.id} className={`hover:bg-${themeColor}-50 dark:hover:bg-${themeColor}-900/10 transition-colors group`}>
@@ -1124,6 +1135,60 @@
                                         </tbody>
                                         <tfoot className="bg-slate-50 dark:bg-slate-800/50 font-bold text-slate-800 dark:text-white"><tr><td colSpan="7" className="p-4 text-right text-slate-600 dark:text-slate-400 uppercase text-sm">{dateFilter.start || dateFilter.end ? 'Tarih Aralığı Toplamı:' : (searchTerm ? 'Filtreli Toplam:' : 'Genel Toplam:')}</td><td className="p-4 text-right text-green-700 dark:text-green-400 font-mono text-lg">{formatCurrency(totalAmount)}</td><td></td></tr></tfoot>
                                     </table>
+									{/* --- SAYFALAMA BUTONLARI --- */}
+                                    <div className="flex flex-col md:flex-row items-center justify-between p-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 gap-4">
+                                        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                                            <span>Her sayfada göster:</span>
+                                            <select 
+                                                value={itemsPerPage} 
+                                                onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} 
+                                                className="border border-slate-300 dark:border-slate-600 rounded p-1 bg-white dark:bg-slate-900 outline-none focus:border-blue-500"
+                                            >
+                                                <option value={50}>50 Kayıt</option>
+                                                <option value={100}>100 Kayıt</option>
+                                                <option value={filteredEntries.length}>Tümü</option>
+                                            </select>
+                                            <span className="hidden md:inline"> | Toplam {filteredEntries.length} kayıt, {totalPages} sayfa</span>
+                                        </div>
+
+                                        <div className="flex items-center gap-2">
+                                            <button 
+                                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))} 
+                                                disabled={currentPage === 1}
+                                                className={`px-3 py-1 rounded border ${currentPage === 1 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white hover:bg-slate-100 text-slate-700'}`}
+                                            >
+                                                &lt; Önceki
+                                            </button>
+                                            
+                                            <div className="flex items-center gap-1">
+                                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                                    // Basit sayfa numaralandırma mantığı (kaydırmalı)
+                                                    let startPage = Math.max(1, currentPage - 2);
+                                                    if (startPage + 4 > totalPages) startPage = Math.max(1, totalPages - 4);
+                                                    const pageNum = startPage + i;
+                                                    if (pageNum > totalPages) return null;
+                                                    
+                                                    return (
+                                                        <button 
+                                                            key={pageNum} 
+                                                            onClick={() => setCurrentPage(pageNum)}
+                                                            className={`w-8 h-8 flex items-center justify-center rounded border text-sm font-medium transition-colors ${currentPage === pageNum ? `bg-${themeColor}-600 text-white border-${themeColor}-600` : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50'}`}
+                                                        >
+                                                            {pageNum}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+
+                                            <button 
+                                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))} 
+                                                disabled={currentPage === totalPages || totalPages === 0}
+                                                className={`px-3 py-1 rounded border ${currentPage === totalPages || totalPages === 0 ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-white hover:bg-slate-100 text-slate-700'}`}
+                                            >
+                                                Sonraki &gt;
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                                 )}
                             </div>
@@ -1139,3 +1204,4 @@
     </script>
 </body>
 </html>
+
