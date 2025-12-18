@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Peşinat Takip</title>
+    <title>Peşinat Takip ve Raporlama</title>
     
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -212,14 +212,21 @@
             const [isLoading, setIsLoading] = useState(true);
             const [viewMode, setViewMode] = useState('list');
             const [searchTerm, setSearchTerm] = useState('');
+			
+            // --- FİLTRELEME STATE'LERİ (YENİ) ---
+            const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+            const [statusFilter, setStatusFilter] = useState('all');
+            const [staffFilter, setStaffFilter] = useState('all');
+            const [officeFilter, setOfficeFilter] = useState('all');
+            const [showReportModal, setShowReportModal] = useState(false);
+
 			// --- SAYFALAMA AYARLARI ---
             const [currentPage, setCurrentPage] = useState(1);
             const [itemsPerPage, setItemsPerPage] = useState(50);
 
             // Arama veya filtre değişirse ilk sayfaya dön
-            useEffect(() => { setCurrentPage(1); }, [searchTerm, dateFilter, statusFilter]);
-            const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
-            const [statusFilter, setStatusFilter] = useState('all');
+            useEffect(() => { setCurrentPage(1); }, [searchTerm, dateFilter, statusFilter, staffFilter, officeFilter]);
+
             const [editingItem, setEditingItem] = useState(null);
             const [deleteConfirmId, setDeleteConfirmId] = useState(null);
             const [permanentDeleteId, setPermanentDeleteId] = useState(null);
@@ -233,6 +240,7 @@
             const [themeColor, setThemeColor] = useState(() => localStorage.getItem('color') || 'blue');
             const themeHex = { blue: '#3b82f6', emerald: '#10b981', violet: '#8b5cf6', amber: '#f59e0b' };
             const darkThemeHex = { blue: '#2563eb', emerald: '#059669', violet: '#7c3aed', amber: '#d97706' };
+            
             useEffect(() => {
                 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
                 if (darkMode) { document.documentElement.classList.add('dark'); localStorage.setItem('theme', 'dark'); } 
@@ -252,7 +260,7 @@
 
             const [formData, setFormData] = useState({
                 receiptNo: '000001', 
-                date: getTurkeyDate(), // Updated
+                date: getTurkeyDate(), 
                 staffName: '', office: '', customerName: '', customerPhone: '', amount: '', image: null, note: ''
             });
             const fileInputRef = useRef(null);
@@ -511,7 +519,6 @@
                 downloadAnchorNode.remove();
             };
             
-            // *** YENİ JSON YÜKLEME (RESTORE) FONKSİYONU ***
             const handleJsonUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -524,24 +531,17 @@
 
                         if (!confirm(`${data.length} adet kayıt veritabanına eklenecek. Bu işlem biraz sürebilir.\n\nOnaylıyor musunuz?`)) return;
 
-                        // Firebase limiti gereği 500'erli paketler halinde (chunk) yükleme yapıyoruz
                         const chunks = [];
                         while(data.length) {
-                            chunks.push(data.splice(0, 450)); // Güvenlik marjı ile 450
+                            chunks.push(data.splice(0, 450));
                         }
 
                         let totalProcessed = 0;
                         for (const chunk of chunks) {
                             const batch = writeBatch(db);
                             chunk.forEach(item => {
-                                // Yeni ID oluştur (eski ID çakışmasını önlemek için, veya item.id kullanıp merge edebilirsiniz.
-                                // Burada temiz bir içe aktarım için yeni ID veriyoruz, ancak veri bütünlüğü için 
-                                // ID'siz alanları temizliyoruz)
                                 const newRef = doc(collection(db, DB_COLLECTION));
-                                const { id, ...itemData } = item; // ID hariç veriyi al
-                                
-                                // Eğer isDeleted true ise yine de yükle, ama genelde yedekten dönülenler aktiftir.
-                                // itemData olduğu gibi yüklenir.
+                                const { id, ...itemData } = item;
                                 batch.set(newRef, itemData);
                             });
                             await batch.commit();
@@ -558,14 +558,40 @@
                 reader.readAsText(file);
             };
 
+            // --- GÜNCELLENMİŞ FİLTRELEME MANTIĞI ---
             const filteredEntries = entries.filter(e => !e.isDeleted).filter(e => {
-                const term = searchTerm.toLowerCase(); const status = (e.status || '').toLowerCase(); const receipt = (e.receiptNo || '').toLowerCase();
+                const term = searchTerm.toLowerCase(); 
+                const status = (e.status || '').toLowerCase(); 
+                const receipt = (e.receiptNo || '').toLowerCase();
                 const phone = (e.customerPhone || '').toLowerCase();
-                if (statusFilter !== 'all' && e.status !== statusFilter) return false;
                 
-                let matchesDate = true; if (dateFilter.start) matchesDate = matchesDate && e.date >= dateFilter.start; if (dateFilter.end) matchesDate = matchesDate && e.date <= dateFilter.end;
-                return (receipt.includes(term) || e.staffName.toLowerCase().includes(term) || e.customerName.toLowerCase().includes(term) || phone.includes(term) || (e.office || '').toLowerCase().includes(term) || status.includes(term)) && matchesDate;
+                // 1. Arama Terimi Kontrolü
+                const matchesSearch = (
+                    receipt.includes(term) || 
+                    e.staffName.toLowerCase().includes(term) || 
+                    e.customerName.toLowerCase().includes(term) || 
+                    phone.includes(term) || 
+                    (e.office || '').toLowerCase().includes(term) || 
+                    status.includes(term)
+                );
+
+                // 2. Durum Filtresi
+                const matchesStatus = statusFilter === 'all' || e.status === statusFilter;
+                
+                // 3. Personel Filtresi
+                const matchesStaff = staffFilter === 'all' || e.staffName === staffFilter;
+
+                // 4. Ofis Filtresi
+                const matchesOffice = officeFilter === 'all' || e.office === officeFilter;
+
+                // 5. Tarih Filtresi
+                let matchesDate = true; 
+                if (dateFilter.start) matchesDate = matchesDate && e.date >= dateFilter.start; 
+                if (dateFilter.end) matchesDate = matchesDate && e.date <= dateFilter.end;
+                
+                return matchesSearch && matchesStatus && matchesStaff && matchesOffice && matchesDate;
             });
+
             const trashEntries = entries.filter(e => e.isDeleted);
 			// --- SAYFALAMA HESABI ---
             const indexOfLastItem = currentPage * itemsPerPage;
@@ -573,6 +599,8 @@
             const currentItems = filteredEntries.slice(indexOfFirstItem, indexOfLastItem);
             const totalPages = Math.ceil(filteredEntries.length / itemsPerPage);
             const totalAmount = filteredEntries.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+            
+            // ... (İstatistik hesaplamaları aynı kalıyor)
             const stats = useMemo(() => {
                 const activeEntries = entries.filter(e => !e.isDeleted);
                 const totalRevenue = activeEntries.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
@@ -627,7 +655,6 @@
                 };
             }, [entries]);
 
-            // ... (Calendar logic same as before) ...
             const getCalendarDays = (year, month) => {
                 const firstDay = new Date(year, month, 1);
                 const lastDay = new Date(year, month + 1, 0);
@@ -653,7 +680,7 @@
                 const dateStr = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day + 1).toISOString().split('T')[0];
                 return getDailyTransactions(dateStr).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
             };
-            // ... (UI parts) ...
+            
             if (!user) {
                 return (
                     <div className={`min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4 transition-colors duration-300`}>
@@ -684,7 +711,52 @@
                     Kayıt tamamen yok olacak.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setPermanentDeleteId(null)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-200">Vazgeç</button><button onClick={confirmPermanentDelete} className="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-bold">KALICI SİL</button></div></div></div>)}
                    {imagePreviewUrl && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setImagePreviewUrl(null)}><div className="bg-white dark:bg-slate-800 p-2 rounded-lg max-w-3xl max-h-[90vh] overflow-auto"><img src={imagePreviewUrl} alt="Dekont" className="max-w-full h-auto rounded" /><div className="text-center mt-2 text-sm text-slate-500 dark:text-slate-400">Kapatmak için dışarı tıklayın</div></div></div>)}
                    
-  
+                    {/* --- YENİ RAPOR MODALI --- */}
+                    {showReportModal && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl border dark:border-slate-700 p-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                                <div className="flex justify-between items-center mb-6 border-b border-slate-100 dark:border-slate-700 pb-4">
+                                    <h3 className="text-xl font-bold flex items-center gap-2 text-slate-800 dark:text-white">
+                                        <Icons.TrendingUp className="text-blue-500" /> Detaylı Performans Raporu
+                                    </h3>
+                                    <button onClick={() => setShowReportModal(false)} className="text-slate-400 hover:text-red-500"><Icons.X /></button>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-4 mb-6">
+                                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-900/30">
+                                        <p className="text-sm text-blue-600 dark:text-blue-400 font-semibold">Filtreli Toplam Ciro</p>
+                                        <p className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{formatCurrency(totalAmount)}</p>
+                                    </div>
+                                    <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-900/30">
+                                        <p className="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">İşlem Adedi</p>
+                                        <p className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{filteredEntries.length} Adet</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4">
+                                    <h4 className="font-semibold text-sm uppercase text-slate-500 dark:text-slate-400 border-b dark:border-slate-700 pb-2">Ofis Bazlı Dağılım (Seçilen Filtreye Göre)</h4>
+                                    <div className="max-h-60 overflow-y-auto pr-2 history-scroll">
+                                        {Object.entries(filteredEntries.reduce((acc, curr) => {
+                                            acc[curr.office || 'Belirsiz'] = (acc[curr.office || 'Belirsiz'] || 0) + parseFloat(curr.amount);
+                                            return acc;
+                                        }, {})).sort(([,a], [,b]) => b - a).map(([office, total]) => (
+                                            <div key={office} className="flex justify-between text-sm py-2 border-b border-slate-50 dark:border-slate-700/50 last:border-0">
+                                                <span className="text-slate-700 dark:text-slate-300 font-medium">{office}</span>
+                                                <span className="font-mono font-bold text-slate-900 dark:text-white">{formatCurrency(total)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                
+                                <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700 flex justify-end">
+                                    <button onClick={() => window.print()} className="px-6 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg flex items-center justify-center gap-2 transition-colors shadow-lg">
+                                        <Icons.Printer className="w-4 h-4" /> Sayfayı Yazdır
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     {/* EDITING ITEM MODAL */}
                    {editingItem && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -786,7 +858,6 @@
                                 <button onClick={() => setDarkMode(!darkMode)} className="p-2 rounded-md text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-600" title={darkMode ?
                                 "Aydınlık Mod" : "Karanlık Mod"}>{darkMode ? <Icons.Sun className="w-4 h-4" /> : <Icons.Moon className="w-4 h-4" />}</button>
                                 
-                                {/* YEDEK YÜKLEME BUTONU (BURAYA EKLENDİ) */}
                                 {isAdmin && (
                                     <>
                                         <div className="h-6 w-px bg-slate-300 dark:bg-slate-600 mx-1"></div>
@@ -1319,36 +1390,63 @@
                       
        
                             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-                                <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex flex-col md:flex-row items-center justify-between gap-4">
+                                
+                                {/* --- GELİŞMİŞ FİLTRE BAR (GÜNCELLENDİ) --- */}
+                                <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex flex-col xl:flex-row items-center justify-between gap-4">
               
-                                    <div className="relative w-full md:w-64"><div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Icons.Search className="h-4 w-4 text-slate-400" /></div><input type="text" className="block w-full pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:border-blue-500 dark:bg-slate-900 dark:text-white" placeholder="Ara (İsim, Tel, Ofis)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-                                    <div className="flex items-center gap-2 
-                                    bg-white dark:bg-slate-900 p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
-                                        <div className="flex items-center gap-1"><span className="text-xs text-slate-400 font-medium pl-2">Başlangıç:</span><input type="date" value={dateFilter.start} onChange={e => setDateFilter(prev => ({...prev, start: e.target.value}))} className="text-sm border-none outline-none text-slate-600 dark:text-slate-300 bg-transparent" /></div>
-                              
-                                        <div className="w-px h-4 bg-slate-200 dark:bg-slate-600"></div>
-                                        <div className="flex items-center gap-1"><span className="text-xs text-slate-400 font-medium">Bitiş:</span><input type="date" value={dateFilter.end} onChange={e => setDateFilter(prev => ({...prev, end: e.target.value}))} className="text-sm border-none outline-none text-slate-600 dark:text-slate-300 bg-transparent" /></div>
-                        
-                                        {(dateFilter.start ||
-                                        dateFilter.end) && (<button onClick={() => setDateFilter({start:'', end:''})} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-400"><Icons.X className="w-3 h-3" /></button>)}
+                                    {/* 1. Arama */}
+                                    <div className="relative w-full xl:w-64">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Icons.Search className="h-4 w-4 text-slate-400" /></div>
+                                        <input type="text" className="block w-full pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm outline-none focus:border-blue-500 dark:bg-slate-900 dark:text-white" placeholder="Ara (İsim, Tel, Ofis, Not)..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                                     </div>
-                                    <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
-   
-                                        <span className="text-xs text-slate-400 font-medium pl-2 flex items-center gap-1"><Icons.Filter className="w-3 h-3"/> Durum:</span>
-                                        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="text-sm border-none outline-none text-slate-600 dark:text-slate-300 bg-transparent cursor-pointer">
-  
-                                            <option value="all">Tümü</option>
-                                            <option value="Teslim Edildi">Teslim Edildi</option>
-          
-                                            <option value="Teslim Edilmedi">Teslim Edilmedi</option>
-                                        </select>
-                       
+                                    
+                                    <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-center xl:justify-start">
+                                        
+                                        {/* 2. Tarih Filtresi */}
+                                        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                                            <div className="flex items-center gap-1"><span className="text-xs text-slate-400 font-medium pl-2">Başlangıç:</span><input type="date" value={dateFilter.start} onChange={e => setDateFilter(prev => ({...prev, start: e.target.value}))} className="text-sm border-none outline-none text-slate-600 dark:text-slate-300 bg-transparent w-28" /></div>
+                                            <div className="w-px h-4 bg-slate-200 dark:bg-slate-600"></div>
+                                            <div className="flex items-center gap-1"><span className="text-xs text-slate-400 font-medium">Bitiş:</span><input type="date" value={dateFilter.end} onChange={e => setDateFilter(prev => ({...prev, end: e.target.value}))} className="text-sm border-none outline-none text-slate-600 dark:text-slate-300 bg-transparent w-28" /></div>
+                                            {(dateFilter.start || dateFilter.end) && (<button onClick={() => setDateFilter({start:'', end:''})} className="p-1 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full text-slate-400"><Icons.X className="w-3 h-3" /></button>)}
+                                        </div>
+
+                                        {/* 3. Durum Filtresi */}
+                                        <div className="flex items-center bg-white dark:bg-slate-900 p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                                            <span className="text-xs text-slate-400 font-medium px-2 flex items-center gap-1"><Icons.Filter className="w-3 h-3"/> Durum</span>
+                                            <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="text-sm border-none outline-none text-slate-600 dark:text-slate-300 bg-transparent cursor-pointer max-w-[100px]">
+                                                <option value="all">Tümü</option>
+                                                <option value="Teslim Edildi">Teslim Edildi</option>
+                                                <option value="Teslim Edilmedi">Teslim Edilmedi</option>
+                                            </select>
+                                        </div>
+
+                                        {/* 4. Personel Filtresi (YENİ) */}
+                                        <div className="flex items-center bg-white dark:bg-slate-900 p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                                            <span className="text-xs text-slate-400 font-medium px-2 flex items-center gap-1"><Icons.User className="w-3 h-3"/> Personel</span>
+                                            <select value={staffFilter} onChange={(e) => setStaffFilter(e.target.value)} className="text-sm border-none outline-none text-slate-600 dark:text-slate-300 bg-transparent cursor-pointer max-w-[120px]">
+                                                <option value="all">Tümü</option>
+                                                {[...new Set(entries.filter(e => !e.isDeleted).map(e => e.staffName))].sort().map(name => (
+                                                    <option key={name} value={name}>{name}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {/* 5. Ofis Filtresi (YENİ) */}
+                                        <div className="flex items-center bg-white dark:bg-slate-900 p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                                            <span className="text-xs text-slate-400 font-medium px-2 flex items-center gap-1"><Icons.Building2 className="w-3 h-3"/> Ofis</span>
+                                            <select value={officeFilter} onChange={(e) => setOfficeFilter(e.target.value)} className="text-sm border-none outline-none text-slate-600 dark:text-slate-300 bg-transparent cursor-pointer max-w-[100px]">
+                                                <option value="all">Tümü</option>
+                                                {OFFICES.map(off => <option key={off} value={off}>{off}</option>)}
+                                            </select>
+                                        </div>
                                     </div>
+
+                                    {/* 6. Aksiyon Butonları */}
                                     <div className="flex items-center gap-2">
+                                        <button onClick={() => setShowReportModal(true)} className={`px-3 py-2 rounded-md text-sm font-medium bg-${themeColor}-100 text-${themeColor}-700 dark:bg-${themeColor}-900/30 dark:text-${themeColor}-300 hover:bg-${themeColor}-200 flex items-center gap-1 transition-colors shadow-sm`} title="Detaylı Rapor Al"><Icons.TrendingUp className="w-4 h-4" /> Raporla</button>
                                         <button onClick={exportToExcel} className="px-3 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-white hover:shadow transition-all flex items-center gap-1" title="Excel Olarak İndir"><Icons.Download className="w-4 h-4" /> Excel</button>
-                                        {/* YENİ JSON YEDEKLEME BUTONU (SADECE YÖNETİCİ) */}
                                         {isAdmin && (
-                                            <button onClick={backupJSON} className="px-3 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-white hover:shadow transition-all flex items-center gap-1" title="JSON Yedeği Al"><Icons.FileJson className="w-4 h-4 text-orange-500" /> JSON Yedek</button>
+                                            <button onClick={backupJSON} className="px-3 py-2 rounded-md text-sm font-medium text-slate-600 hover:bg-white hover:shadow transition-all flex items-center gap-1" title="JSON Yedeği Al"><Icons.FileJson className="w-4 h-4 text-orange-500" /> JSON</button>
                                         )}
                                     </div>
                                
@@ -1459,8 +1557,10 @@
                                                     );
                                                 })}
                                             </tbody>
-                                            <tfoot className="bg-slate-50 dark:bg-slate-800/50 font-bold text-slate-800 dark:text-white"><tr><td colSpan="7" className="p-4 text-right text-slate-600 dark:text-slate-400 uppercase text-sm">{dateFilter.start ||
-                                            dateFilter.end ? 'Tarih Aralığı Toplamı:' : (searchTerm ? 'Filtreli Toplam:' : 'Genel Toplam:')}</td><td className="p-4 text-right text-green-700 dark:text-green-400 font-mono text-lg">{formatCurrency(totalAmount)}</td><td></td></tr></tfoot>
+                                            <tfoot className="bg-slate-50 dark:bg-slate-800/50 font-bold text-slate-800 dark:text-white"><tr><td colSpan="7" className="p-4 text-right text-slate-600 dark:text-slate-400 uppercase text-sm">
+                                                {/* DİNAMİK TOPLAM ETİKETİ */}
+                                                {(dateFilter.start || dateFilter.end || staffFilter !== 'all' || officeFilter !== 'all' || statusFilter !== 'all' || searchTerm) ? 'Filtreli Toplam:' : 'Genel Toplam:'}
+                                            </td><td className="p-4 text-right text-green-700 dark:text-green-400 font-mono text-lg">{formatCurrency(totalAmount)}</td><td></td></tr></tfoot>
                                         </table>
                                         {/* --- SAYFALAMA BUTONLARI --- */}
                                         <div className="flex flex-col md:flex-row items-center 
