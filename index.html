@@ -26,8 +26,9 @@
                 'bg-emerald-500', 'bg-emerald-600', 'bg-emerald-100', 'text-emerald-600', 'text-emerald-500', 'text-emerald-900',
                 'bg-violet-500', 'bg-violet-600', 'bg-violet-100', 'text-violet-600', 'text-violet-500', 'text-violet-900',
                 'bg-amber-500', 'bg-amber-600', 'bg-amber-100', 'text-amber-600', 'text-amber-500', 'text-amber-900',
-                'dark:bg-blue-600', 'dark:bg-emerald-600', 'dark:bg-violet-600', 'dark:bg-amber-600',
-                'dark:text-blue-300', 'dark:text-emerald-300', 'dark:text-violet-300', 'dark:text-amber-300'
+                'bg-purple-500', 'bg-purple-600', 'bg-purple-100', 'text-purple-600', 'text-purple-500', 'text-purple-900',
+                'dark:bg-blue-600', 'dark:bg-emerald-600', 'dark:bg-violet-600', 'dark:bg-amber-600', 'dark:bg-purple-600',
+                'dark:text-blue-300', 'dark:text-emerald-300', 'dark:text-violet-300', 'dark:text-amber-300', 'dark:text-purple-300'
             ]
         }
     </script>
@@ -238,8 +239,8 @@
             const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
             const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
             const [themeColor, setThemeColor] = useState(() => localStorage.getItem('color') || 'blue');
-            const themeHex = { blue: '#3b82f6', emerald: '#10b981', violet: '#8b5cf6', amber: '#f59e0b' };
-            const darkThemeHex = { blue: '#2563eb', emerald: '#059669', violet: '#7c3aed', amber: '#d97706' };
+            const themeHex = { blue: '#3b82f6', emerald: '#10b981', violet: '#8b5cf6', amber: '#f59e0b', purple: '#9333ea' };
+            const darkThemeHex = { blue: '#2563eb', emerald: '#059669', violet: '#7c3aed', amber: '#d97706', purple: '#7e22ce' };
             
             useEffect(() => {
                 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
@@ -428,6 +429,16 @@
                 } catch (error) { console.error(error);
                 }
             };
+
+            const handleCancel = async (entry) => {
+                if (!isAdmin) return;
+                if (!window.confirm(`"${entry.customerName}" işlemini İPTAL etmek istediğinize emin misiniz?\nBu işlem cirodan düşülecektir.`)) return;
+                try {
+                    const historyEntry = { updatedAt: new Date().toISOString(), action: 'İşlem İptal Edildi', user: user.email };
+                    await updateDoc(doc(db, DB_COLLECTION, entry.id), { status: 'İptal', history: [...(entry.history || []), historyEntry] });
+                } catch (error) { alert("Hata: " + error.message); }
+            };
+
             const sendWhatsapp = (entry) => {
                 if (!entry.customerPhone) {
                     alert("Bu müşterinin telefon numarası kayıtlı değil.");
@@ -598,11 +609,15 @@
             const indexOfFirstItem = indexOfLastItem - itemsPerPage;
             const currentItems = filteredEntries.slice(indexOfFirstItem, indexOfLastItem);
             const totalPages = Math.ceil(filteredEntries.length / itemsPerPage);
-            const totalAmount = filteredEntries.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+            
+            // DÜZELTME: İPTAL EDİLENLER TOPLAMA DAHİL EDİLMEZ
+            const totalAmount = filteredEntries.reduce((sum, item) => sum + (item.status === 'İptal' ? 0 : (Number(item.amount) || 0)), 0);
             
             // ... (İstatistik hesaplamaları aynı kalıyor)
             const stats = useMemo(() => {
-                const activeEntries = entries.filter(e => !e.isDeleted);
+                // DÜZELTME: CİRO HESABINDAN İPTALLERİ DÜŞMEK İÇİN status !== 'İptal' EKLENDİ
+                const activeEntries = entries.filter(e => !e.isDeleted && e.status !== 'İptal');
+                
                 const totalRevenue = activeEntries.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
                 const currentMonth = new Date().toISOString().slice(0, 7);
                 const monthlyRevenue = activeEntries.filter(e => e.date.startsWith(currentMonth)).reduce((acc, curr) => acc + 
@@ -785,7 +800,7 @@
                                         </select>
                   
                                     </div>
-                                    <div className="space-y-2"><label className="text-sm font-semibold">Durum</label><select value={editingItem.status} onChange={(e) => setEditingItem(p => ({...p, status: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900"><option value="Teslim Edilmedi">Teslim Edilmedi</option><option value="Teslim Edildi">Teslim Edildi</option></select></div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Durum</label><select value={editingItem.status} onChange={(e) => setEditingItem(p => ({...p, status: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900"><option value="Teslim Edilmedi">Teslim Edilmedi</option><option value="Teslim Edildi">Teslim Edildi</option><option value="İptal">İptal (Satış İptali)</option></select></div>
                       
                                     <div className="col-span-1 md:col-span-2">
                                         <label className="text-sm font-semibold">Açıklama / Not</label>
@@ -880,19 +895,19 @@
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
        
                                     <div className={`bg-gradient-to-br from-${themeColor}-500 to-${themeColor}-600 rounded-xl p-6 text-white shadow-lg shadow-${themeColor}-200 dark:shadow-none`}>
-                                        <div className={`text-${themeColor}-100 text-sm font-medium mb-1`}>Toplam Ciro</div>
+                                        <div className={`text-${themeColor}-100 text-sm font-medium mb-1`}>Toplam Ciro (Aktif)</div>
                  
                                         <div className="text-3xl font-bold">{formatCurrency(stats.totalRevenue)}</div>
                                     </div>
                                     <div className="bg-white dark:bg-slate-800 
                                     border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
-                                        <div className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Bu Ayın Cirosu</div>
+                                        <div className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1">Bu Ayın Cirosu (Aktif)</div>
                                         <div className="text-3xl font-bold text-slate-800 dark:text-white">{formatCurrency(stats.monthlyRevenue)}</div>
     
                                     </div>
                                     <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm">
                         
-                                        <div className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1 flex items-center gap-2"><Icons.Clock className="w-4 h-4 text-green-500"/> Bugünün Cirosu</div>
+                                        <div className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-1 flex items-center gap-2"><Icons.Clock className="w-4 h-4 text-green-500"/> Bugünün Cirosu (Aktif)</div>
                                         <div className="text-3xl font-bold text-green-600 dark:text-green-400">{formatCurrency(stats.dailyRevenue)}</div>
                            
                                     </div>
@@ -1417,6 +1432,7 @@
                                                 <option value="all">Tümü</option>
                                                 <option value="Teslim Edildi">Teslim Edildi</option>
                                                 <option value="Teslim Edilmedi">Teslim Edilmedi</option>
+                                                <option value="İptal">İptal Edilenler</option>
                                             </select>
                                         </div>
 
@@ -1475,6 +1491,8 @@
                                   
                                                 {currentItems.map((entry) => {	
                                                     const isDelivered = entry.status === 'Teslim Edildi';
+                                                    const isCancelled = entry.status === 'İptal';
+
                                                     return (
                                                         <tr key={entry.id} className={`hover:bg-${themeColor}-50 dark:hover:bg-${themeColor}-900/10 transition-colors group`}>
                                             
@@ -1502,12 +1520,24 @@
                                                             </td>
                                     
                                                             <td className="p-4 text-center">{entry.image && (<button onClick={() => setImagePreviewUrl(entry.image)} className={`text-slate-400 hover:text-${themeColor}-600 transition-colors`} title="Dekontu Gör"><Icons.ImageIcon className="w-5 h-5" /></button>)}</td>
-                                                            <td className="p-4 text-center"><button onClick={() => 
-                                                            toggleStatus(entry)} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold border ${isDelivered ?
-                                                            'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-200' : 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100'} ${!isAdmin ?
-                                                            'cursor-not-allowed opacity-70' : ''}`} disabled={!isAdmin}>{isDelivered ? <Icons.CheckCircle2 className="w-3 h-3" /> : <Icons.Clock className="w-3 h-3" />} {entry.status ||
-                                                            'Bekliyor'}</button></td>
-                                                            <td className="p-4 text-right font-mono font-medium text-slate-700 dark:text-slate-300">{formatCurrency(entry.amount)}</td>
+                                                            <td className="p-4 text-center">
+                                                                <button onClick={() => toggleStatus(entry)} 
+                                                                    className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold border transition-colors
+                                                                    ${isCancelled 
+                                                                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-200 dark:border-purple-800 cursor-default' 
+                                                                        : (isDelivered 
+                                                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800 hover:bg-green-200' 
+                                                                            : 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800 hover:bg-orange-100')
+                                                                    } ${!isAdmin ? 'cursor-not-allowed opacity-70' : ''}`} 
+                                                                    disabled={!isAdmin || isCancelled}>
+                                                                    
+                                                                    {isCancelled ? <Icons.Ban className="w-3 h-3" /> : (isDelivered ? <Icons.CheckCircle2 className="w-3 h-3" /> : <Icons.Clock className="w-3 h-3" />)} 
+                                                                    {entry.status || 'Bekliyor'}
+                                                                </button>
+                                                            </td>
+                                                            <td className="p-4 text-right font-mono font-medium text-slate-700 dark:text-slate-300">
+                                                                {isCancelled ? <span className="line-through text-slate-400">{formatCurrency(entry.amount)}</span> : formatCurrency(entry.amount)}
+                                                            </td>
                                         
                                                             <td className="p-4 text-center">
                                                                 <div className="flex items-center justify-center gap-1">
@@ -1542,7 +1572,12 @@
                                                                     {isAdmin && (
                                 
                                                                         <>
-                                                                
+                                                                            {!isCancelled && (
+                                                                                <button onClick={() => handleCancel(entry)} className="text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 p-1.5 rounded hover:bg-purple-50 dark:hover:bg-purple-900/20" title="İptal Et">
+                                                                                    <Icons.Ban className="w-4 h-4" />
+                                                                                </button>
+                                                                            )}
+
                                                                             <button onClick={() => setEditingItem({...entry, original: {...entry}})} className={`text-${themeColor}-400 hover:text-${themeColor}-600 dark:text-${themeColor}-400 dark:hover:text-${themeColor}-300 p-1.5 rounded hover:bg-${themeColor}-100 dark:hover:bg-${themeColor}-900/20`} title="Düzenle"><Icons.Pencil className="w-4 h-4" /></button>
                                                                             <button 
                                                                             onClick={() => setDeleteConfirmId(entry.id)} className="text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20" title="Çöp Kutusuna Taşı"><Icons.Trash2 className="w-4 h-4" /></button>
@@ -1559,7 +1594,7 @@
                                             </tbody>
                                             <tfoot className="bg-slate-50 dark:bg-slate-800/50 font-bold text-slate-800 dark:text-white"><tr><td colSpan="7" className="p-4 text-right text-slate-600 dark:text-slate-400 uppercase text-sm">
                                                 {/* DİNAMİK TOPLAM ETİKETİ */}
-                                                {(dateFilter.start || dateFilter.end || staffFilter !== 'all' || officeFilter !== 'all' || statusFilter !== 'all' || searchTerm) ? 'Filtreli Toplam:' : 'Genel Toplam:'}
+                                                {(dateFilter.start || dateFilter.end || staffFilter !== 'all' || officeFilter !== 'all' || statusFilter !== 'all' || searchTerm) ? 'Filtreli Toplam (Aktif):' : 'Genel Toplam (Aktif):'}
                                             </td><td className="p-4 text-right text-green-700 dark:text-green-400 font-mono text-lg">{formatCurrency(totalAmount)}</td><td></td></tr></tfoot>
                                         </table>
                                         {/* --- SAYFALAMA BUTONLARI --- */}
