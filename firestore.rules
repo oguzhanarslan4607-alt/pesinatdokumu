@@ -50,6 +50,7 @@ service cloud.firestore {
           "office",
           "customerName",
           "customerPhone",
+          "managerPhone",
           "amount",
           "image",
           "note",

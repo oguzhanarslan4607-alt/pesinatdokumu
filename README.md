@@ -42,6 +42,10 @@ Kayıt oluşturma, düzenleme, silme, geri yükleme, iptal, JSON yedek alma/yük
 
 Dashboard günlük kasa özetini, ofis/personel kırılımını, iptal nedenlerini ve son audit kayıtlarını gösterir. Liste ekranında tarih, durum, personel, ofis, dekont var/yok, tutar aralığı ve oluşturan kullanıcı filtreleri bulunur.
 
+## Ofis Bildirimleri
+
+Sabit ofislerin müdür telefonları uygulama ayarlarında tutulur. `Diğer` ofisi dış kaynaklı/tek seferlik para girişleri için kullanılır; bu ofis seçildiğinde kayıt sırasında manuel bildirim telefonu girilebilir ve WhatsApp bildirimi o numaraya yönlendirilir.
+
 ## Yedekleme
 
 JSON restore işlemi artık:
