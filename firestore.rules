@@ -7,11 +7,24 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return signedIn() && request.auth.token.email in [
-        "admin@demo.com",
-        "yonetici@sirket.com",
-        "oguzhanarslan4607@gmail.com"
-      ];
+      return signedIn()
+        && (
+          request.auth.token.email in [
+            "admin@demo.com",
+            "yonetici@sirket.com",
+            "oguzhanarslan4607@gmail.com",
+            "oguzhanarslangemini@gmail.com"
+          ]
+          || get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.role == "admin"
+        );
+    }
+
+    function isStaff() {
+      return isAdmin()
+        || (
+          signedIn()
+          && get(/databases/$(database)/documents/users/$(request.auth.token.email)).data.role == "staff"
+        );
     }
 
     function validStatus(status) {
@@ -44,7 +57,10 @@ service cloud.firestore {
           "history",
           "createdAt",
           "createdBy",
-          "isDeleted"
+          "isDeleted",
+          "cancelReason",
+          "cancelledAt",
+          "cancelledBy"
         ])
         && data.receiptNo is string
         && data.date is string
@@ -60,12 +76,31 @@ service cloud.firestore {
 
     match /pesinatlar/{entryId} {
       allow read: if signedIn();
-      allow create, update: if isAdmin() && validEntry(request.resource.data);
+      allow create: if isStaff() && validEntry(request.resource.data);
+      allow update: if isAdmin() && validEntry(request.resource.data);
       allow delete: if isAdmin();
     }
 
     match /_meta/{docId} {
-      allow read, write: if isAdmin();
+      allow read: if isStaff();
+      allow write: if isStaff();
+    }
+
+    match /users/{email} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin()
+        && request.resource.data.email == email
+        && request.resource.data.role in ["admin", "staff", "viewer"];
+      allow delete: if isAdmin();
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.user == request.auth.token.email
+        && request.resource.data.createdAt is string
+        && request.resource.data.action is string;
+      allow update, delete: if false;
     }
 
     match /{document=**} {

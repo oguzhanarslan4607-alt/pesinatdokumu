@@ -63,7 +63,7 @@
 
     <script type="text/babel" data-type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, onSnapshot, doc, deleteDoc, updateDoc, query, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, deleteDoc, updateDoc, query, writeBatch, runTransaction, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         // =================================================================
@@ -80,7 +80,8 @@
         const ADMIN_EMAILS = [
             "admin@demo.com",
             "yonetici@sirket.com",
-            "oguzhanarslan4607@gmail.com"
+            "oguzhanarslan4607@gmail.com",
+            "oguzhanarslangemini@gmail.com"
         ];
         const OFFICES = [
             "Asena", "Asrın", "Dağıtım", "Efsane", "Elbistan", "Merkez Aktif", "Star",
@@ -105,8 +106,11 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         const DB_COLLECTION = "pesinatlar";
+        const USERS_COLLECTION = "users";
+        const AUDIT_COLLECTION = "auditLogs";
         const META_COLLECTION = "_meta";
         const RECEIPT_COUNTER_DOC = "receiptCounter";
+        const BACKUP_REMINDER_DAYS = 7;
 
         const { useState, useEffect, useRef, useMemo } = React;
 
@@ -213,6 +217,8 @@
             const [installPrompt, setInstallPrompt] = useState(null);
 
             const [entries, setEntries] = useState([]);
+            const [userProfiles, setUserProfiles] = useState({});
+            const [auditLogs, setAuditLogs] = useState([]);
             const [isLoading, setIsLoading] = useState(true);
             const [viewMode, setViewMode] = useState('list');
             const [searchTerm, setSearchTerm] = useState('');
@@ -222,7 +228,11 @@
             const [statusFilter, setStatusFilter] = useState('all');
             const [staffFilter, setStaffFilter] = useState('all');
             const [officeFilter, setOfficeFilter] = useState('all');
+            const [creatorFilter, setCreatorFilter] = useState('all');
+            const [attachmentFilter, setAttachmentFilter] = useState('all');
+            const [amountFilter, setAmountFilter] = useState({ min: '', max: '' });
             const [showReportModal, setShowReportModal] = useState(false);
+            const [showUsersModal, setShowUsersModal] = useState(false);
 
 			// --- SAYFALAMA AYARLARI ---
             const [currentPage, setCurrentPage] = useState(1);
@@ -232,9 +242,11 @@
             const [monthTotal, setMonthTotal] = useState(null);
 
             // Arama veya filtre değişirse ilk sayfaya dön
-            useEffect(() => { setCurrentPage(1); }, [searchTerm, dateFilter, statusFilter, staffFilter, officeFilter]);
+            useEffect(() => { setCurrentPage(1); }, [searchTerm, dateFilter, statusFilter, staffFilter, officeFilter, creatorFilter, attachmentFilter, amountFilter]);
 
             const [editingItem, setEditingItem] = useState(null);
+            const [cancelTarget, setCancelTarget] = useState(null);
+            const [cancelReason, setCancelReason] = useState('');
             const [deleteConfirmId, setDeleteConfirmId] = useState(null);
             const [permanentDeleteId, setPermanentDeleteId] = useState(null);
             const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
@@ -245,6 +257,7 @@
             const [selectedCalendarDate, setSelectedCalendarDate] = useState(null);
             const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
             const [themeColor, setThemeColor] = useState(() => localStorage.getItem('color') || 'blue');
+            const [userForm, setUserForm] = useState({ email: '', role: 'viewer', displayName: '' });
             const themeHex = { blue: '#3b82f6', emerald: '#10b981', violet: '#8b5cf6', amber: '#f59e0b', purple: '#9333ea' };
             const darkThemeHex = { blue: '#2563eb', emerald: '#059669', violet: '#7c3aed', amber: '#d97706', purple: '#7e22ce' };
 
@@ -285,10 +298,22 @@
                 const parsed = parseInt(value || "0", 10);
                 return Number.isFinite(parsed) ? parsed : 0;
             };
-            const isAdminEmail = (email) => ADMIN_EMAILS.includes((email || '').toLowerCase());
+            const getUserRole = (email) => {
+                const normalizedEmail = (email || '').toLowerCase();
+                return userProfiles[normalizedEmail]?.role || (ADMIN_EMAILS.includes(normalizedEmail) ? 'admin' : 'viewer');
+            };
+            const isAdminEmail = (email) => getUserRole(email) === 'admin';
+            const canEditEntries = () => ['admin', 'staff'].includes(getUserRole(user?.email));
             const requireAdmin = () => {
                 if (!isAdmin || !user || !isAdminEmail(user.email)) {
                     alert("Bu işlem için yönetici yetkisi gerekir.");
+                    return false;
+                }
+                return true;
+            };
+            const requireStaff = () => {
+                if (!user || !canEditEntries()) {
+                    alert("Bu işlem için personel veya yönetici yetkisi gerekir.");
                     return false;
                 }
                 return true;
@@ -367,6 +392,57 @@
                     image: item.image || null
                 };
             };
+            const createAuditLog = async (action, details = {}) => {
+                if (!user) return;
+                try {
+                    await setDoc(doc(collection(db, AUDIT_COLLECTION)), {
+                        action,
+                        details,
+                        entryId: details.entryId || null,
+                        receiptNo: details.receiptNo || null,
+                        user: user.email,
+                        createdAt: new Date().toISOString()
+                    });
+                } catch (error) {
+                    console.error("Audit log yazılamadı:", error);
+                }
+            };
+            const saveUserProfile = async () => {
+                if (!requireAdmin()) return;
+                const email = userForm.email.trim().toLowerCase();
+                if (!email || !email.includes('@')) return alert("Geçerli bir e-posta girin.");
+                const profile = {
+                    email,
+                    role: userForm.role,
+                    displayName: userForm.displayName.trim(),
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: user.email
+                };
+                try {
+                    await setDoc(doc(db, USERS_COLLECTION, email), profile, { merge: true });
+                    await createAuditLog('Kullanıcı yetkisi güncellendi', { targetEmail: email, role: userForm.role });
+                    setUserForm({ email: '', role: 'viewer', displayName: '' });
+                } catch (error) {
+                    alert("Kullanıcı kaydedilemedi: " + error.message);
+                }
+            };
+            const removeUserProfile = async (email) => {
+                if (!requireAdmin()) return;
+                if (!confirm(`${email} kullanıcısının yetkisi silinsin mi?`)) return;
+                try {
+                    await deleteDoc(doc(db, USERS_COLLECTION, email));
+                    await createAuditLog('Kullanıcı yetkisi silindi', { targetEmail: email });
+                } catch (error) {
+                    alert("Kullanıcı silinemedi: " + error.message);
+                }
+            };
+            const getLastBackupDate = () => localStorage.getItem('lastBackupDate') || '';
+            const shouldShowBackupReminder = () => {
+                const lastBackup = getLastBackupDate();
+                if (!lastBackup) return true;
+                const diffMs = new Date(`${getTurkeyDate()}T12:00:00`) - new Date(`${lastBackup}T12:00:00`);
+                return diffMs / 86400000 >= BACKUP_REMINDER_DAYS;
+            };
 
             const [formData, setFormData] = useState({
                 receiptNo: '000001',
@@ -381,12 +457,29 @@
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
                     setUser(currentUser);
-                    if (currentUser) { setLoginError(''); setIsAdmin(isAdminEmail(currentUser.email)); }
+                    if (currentUser) { setLoginError(''); }
                     else { setIsAdmin(false); }
                 });
 
                 return () => unsubscribe();
             }, []);
+            useEffect(() => {
+                if (!user) return;
+                const unsubscribe = onSnapshot(collection(db, USERS_COLLECTION), (snapshot) => {
+                    const profiles = {};
+                    snapshot.docs.forEach(userDoc => {
+                        const data = userDoc.data();
+                        const email = (data.email || userDoc.id || '').toLowerCase();
+                        if (email) profiles[email] = { id: userDoc.id, ...data, email };
+                    });
+                    setUserProfiles(profiles);
+                }, console.error);
+                return () => unsubscribe();
+            }, [user]);
+            useEffect(() => {
+                if (!user) return;
+                setIsAdmin(isAdminEmail(user.email));
+            }, [user, userProfiles]);
             useEffect(() => {
                 if (!user) return;
                 const q = query(collection(db, DB_COLLECTION));
@@ -402,6 +495,15 @@
                 }, (error) => { console.error(error); setIsLoading(false); });
                 return () => unsubscribe();
             }, [user]);
+            useEffect(() => {
+                if (!user || !isAdmin) { setAuditLogs([]); return; }
+                const unsubscribe = onSnapshot(collection(db, AUDIT_COLLECTION), (snapshot) => {
+                    const logs = snapshot.docs.map(logDoc => ({ id: logDoc.id, ...logDoc.data() }));
+                    logs.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+                    setAuditLogs(logs.slice(0, 200));
+                }, console.error);
+                return () => unsubscribe();
+            }, [user, isAdmin]);
             useEffect(() => {
                 if (!formData.staffName && !formData.amount && !formData.customerName) {
                     let maxReceiptNo = 0;
@@ -466,13 +568,14 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                if (!requireAdmin()) return;
+                if (!requireStaff()) return;
                 const amount = toValidAmount(formData.amount);
                 if (!amount) return alert("Tutar 0'dan büyük olmalıdır.");
                 if (!formData.staffName || !formData.customerName || !formData.date) return alert("Personel, müşteri ve tarih zorunludur.");
                 try {
                     const newEntry = { ...formData, amount, status: 'Teslim Edilmedi', history: [], createdAt: new Date().toISOString(), createdBy: user.email, isDeleted: false };
                     const receiptNo = await createEntryWithReceipt(newEntry);
+                    await createAuditLog('Kayıt oluşturuldu', { receiptNo, customerName: formData.customerName, amount, office: formData.office });
 
                     if(OFFICE_PHONES[formData.office]) {
                         if(confirm(`Kayıt Başarılı.\n${formData.office} ofis müdürüne bildirim gönderilsin mi?`)) {
@@ -491,6 +594,8 @@
                 try {
                     const historyEntry = { updatedAt: new Date().toISOString(), action: 'Çöp Kutusuna Taşındı', user: user.email };
                     await updateDoc(doc(db, DB_COLLECTION, deleteConfirmId), { isDeleted: true, history: [...(entries.find(e => e.id === deleteConfirmId)?.history || []), historyEntry] });
+                    const deletedEntry = entries.find(e => e.id === deleteConfirmId);
+                    await createAuditLog('Kayıt çöp kutusuna taşındı', { entryId: deleteConfirmId, receiptNo: deletedEntry?.receiptNo });
                     setDeleteConfirmId(null);
                 } catch (error) { alert("Silinemedi: " + error.message); }
             };
@@ -499,12 +604,16 @@
                 try {
                     const historyEntry = { updatedAt: new Date().toISOString(), action: 'Çöp Kutusundan Geri Yüklendi', user: user.email };
                     await updateDoc(doc(db, DB_COLLECTION, id), { isDeleted: false, history: [...(entries.find(e => e.id === id)?.history || []), historyEntry] });
+                    const restoredEntry = entries.find(e => e.id === id);
+                    await createAuditLog('Kayıt geri yüklendi', { entryId: id, receiptNo: restoredEntry?.receiptNo });
                 } catch (error) { alert("Geri yüklenemedi: " + error.message); }
             };
             const confirmPermanentDelete = async () => {
                 if (!requireAdmin()) return;
                 try {
+                    const deletedEntry = entries.find(e => e.id === permanentDeleteId);
                     await deleteDoc(doc(db, DB_COLLECTION, permanentDeleteId));
+                    await createAuditLog('Kayıt kalıcı silindi', { entryId: permanentDeleteId, receiptNo: deletedEntry?.receiptNo });
                     setPermanentDeleteId(null);
                 } catch (error) { alert("Silinemedi: " + error.message); }
             };
@@ -533,6 +642,7 @@
                     const updateData = { ...editingItem, amount, history: [...(editingItem.history || []), historyEntry] };
                     delete updateData.original;
                     await updateDoc(doc(db, DB_COLLECTION, editingItem.id), updateData);
+                    await createAuditLog('Kayıt düzenlendi', { entryId: editingItem.id, receiptNo: editingItem.receiptNo, changes });
                     setEditingItem(null);
                 } catch (error) { alert("Güncellenemedi: " + error.message); }
             };
@@ -543,16 +653,32 @@
                 try {
                     const historyEntry = { updatedAt: new Date().toISOString(), action: 'Durum Değişti: ' + nextStatus, user: user.email };
                     await updateDoc(doc(db, DB_COLLECTION, entry.id), { status: nextStatus, history: [...(entry.history || []), historyEntry] });
+                    await createAuditLog('Durum değişti', { entryId: entry.id, receiptNo: entry.receiptNo, status: nextStatus });
                 } catch (error) { console.error(error);
                 }
             };
 
             const handleCancel = async (entry) => {
                 if (!requireAdmin()) return;
-                if (!window.confirm(`"${entry.customerName}" işlemini İPTAL etmek istediğinize emin misiniz?\nBu işlem cirodan düşülecektir.`)) return;
+                setCancelTarget(entry);
+                setCancelReason('');
+            };
+            const confirmCancel = async () => {
+                if (!cancelTarget || !requireAdmin()) return;
+                const reason = cancelReason.trim();
+                if (reason.length < 5) return alert("İptal nedeni en az 5 karakter olmalıdır.");
                 try {
-                    const historyEntry = { updatedAt: new Date().toISOString(), action: 'İşlem İptal Edildi', user: user.email };
-                    await updateDoc(doc(db, DB_COLLECTION, entry.id), { status: 'İptal', history: [...(entry.history || []), historyEntry] });
+                    const historyEntry = { updatedAt: new Date().toISOString(), action: `İşlem İptal Edildi: ${reason}`, user: user.email };
+                    await updateDoc(doc(db, DB_COLLECTION, cancelTarget.id), {
+                        status: 'İptal',
+                        cancelReason: reason,
+                        cancelledAt: new Date().toISOString(),
+                        cancelledBy: user.email,
+                        history: [...(cancelTarget.history || []), historyEntry]
+                    });
+                    await createAuditLog('Kayıt iptal edildi', { entryId: cancelTarget.id, receiptNo: cancelTarget.receiptNo, reason });
+                    setCancelTarget(null);
+                    setCancelReason('');
                 } catch (error) { alert("Hata: " + error.message); }
             };
 
@@ -650,6 +776,8 @@
                 document.body.appendChild(downloadAnchorNode);
                 downloadAnchorNode.click();
                 downloadAnchorNode.remove();
+                localStorage.setItem('lastBackupDate', getTurkeyDate());
+                createAuditLog('JSON yedek alındı', { count: entries.length });
             };
 
             const handleJsonUpload = (e) => {
@@ -691,6 +819,7 @@
                             totalProcessed += chunk.length;
                         }
                         await syncReceiptCounterAtLeast(highestImportedReceiptNo);
+                        await createAuditLog('JSON yedek geri yüklendi', { count: totalProcessed, highestImportedReceiptNo });
 
                         alert(`${totalProcessed} kayıt başarıyla yüklendi!`);
                         if (uploadFileInputRef.current) uploadFileInputRef.current.value = "";
@@ -722,12 +851,17 @@
                 const matchesStatus = statusFilter === 'all' || e.status === statusFilter;
                 const matchesStaff = staffFilter === 'all' || e.staffName === staffFilter;
                 const matchesOffice = officeFilter === 'all' || e.office === officeFilter;
+                const matchesCreator = creatorFilter === 'all' || e.createdBy === creatorFilter;
+                const matchesAttachment = attachmentFilter === 'all' || (attachmentFilter === 'with' ? Boolean(e.image) : !e.image);
+                const amount = Number(e.amount) || 0;
+                const matchesAmountMin = !amountFilter.min || amount >= Number(amountFilter.min);
+                const matchesAmountMax = !amountFilter.max || amount <= Number(amountFilter.max);
 
                 let matchesDate = true;
                 if (dateFilter.start) matchesDate = matchesDate && e.date >= dateFilter.start;
                 if (dateFilter.end) matchesDate = matchesDate && e.date <= dateFilter.end;
 
-                return matchesSearch && matchesStatus && matchesStaff && matchesOffice && matchesDate;
+                return matchesSearch && matchesStatus && matchesStaff && matchesOffice && matchesCreator && matchesAttachment && matchesAmountMin && matchesAmountMax && matchesDate;
             });
             const filteredActiveEntries = filteredEntries.filter(e => e.status !== 'İptal');
 
@@ -739,6 +873,28 @@
             const totalPages = Math.max(1, Math.ceil(filteredEntries.length / safeItemsPerPage));
 
             const totalAmount = filteredActiveEntries.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+            const todaysActiveEntries = entries.filter(e => !e.isDeleted && e.status !== 'İptal' && e.date === getTurkeyDate());
+            const dailyCashSummary = {
+                count: todaysActiveEntries.length,
+                total: todaysActiveEntries.reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
+                delivered: todaysActiveEntries.filter(e => e.status === 'Teslim Edildi').reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
+                pending: todaysActiveEntries.filter(e => e.status === 'Teslim Edilmedi').reduce((sum, item) => sum + (Number(item.amount) || 0), 0),
+                byOffice: todaysActiveEntries.reduce((acc, item) => {
+                    const key = item.office || 'Belirtilmemiş';
+                    acc[key] = (acc[key] || 0) + (Number(item.amount) || 0);
+                    return acc;
+                }, {}),
+                byStaff: todaysActiveEntries.reduce((acc, item) => {
+                    const key = item.staffName || 'Belirtilmemiş';
+                    acc[key] = (acc[key] || 0) + (Number(item.amount) || 0);
+                    return acc;
+                }, {})
+            };
+            const cancellationSummary = entries.filter(e => !e.isDeleted && e.status === 'İptal').reduce((acc, item) => {
+                const reason = item.cancelReason || 'Neden belirtilmemiş';
+                acc[reason] = (acc[reason] || 0) + 1;
+                return acc;
+            }, {});
 
             const stats = useMemo(() => {
                 const activeEntries = entries.filter(e => !e.isDeleted && e.status !== 'İptal');
@@ -839,7 +995,35 @@
                 <div className={`min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-4 md:p-8 relative transition-colors duration-300`}>
                    {deleteConfirmId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full"><h3 className="text-lg font-bold text-slate-900 dark:text-white text-center">Çöp Kutusuna Taşı?</h3><p className="text-slate-500 dark:text-slate-400 mt-1 text-sm text-center">Bu kaydı daha sonra geri yükleyebilirsiniz.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setDeleteConfirmId(null)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-200">İptal</button><button onClick={confirmSoftDelete} className="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700">Sil</button></div></div></div>)}
                    {permanentDeleteId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full border-2 border-red-500"><h3 className="text-lg font-bold text-red-600 text-center">DİKKAT: KALICI SİLME!</h3><p className="text-slate-500 dark:text-slate-400 mt-1 text-sm text-center">Bu işlem geri alınamaz. Kayıt tamamen yok olacak.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setPermanentDeleteId(null)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-200">Vazgeç</button><button onClick={confirmPermanentDelete} className="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-bold">KALICI SİL</button></div></div></div>)}
+                   {cancelTarget && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-md w-full"><h3 className="text-lg font-bold text-purple-700 dark:text-purple-300 text-center">İptal Nedeni</h3><p className="text-slate-500 dark:text-slate-400 mt-1 text-sm text-center">{cancelTarget.customerName} kaydı cirodan düşülecek.</p><textarea value={cancelReason} onChange={e => setCancelReason(e.target.value)} className="w-full mt-4 p-3 border dark:border-slate-600 rounded-lg dark:bg-slate-900 h-24 resize-none" placeholder="İptal nedenini yazın..." autoFocus></textarea><div className="flex gap-3 w-full mt-4"><button onClick={() => { setCancelTarget(null); setCancelReason(''); }} className="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-200">Vazgeç</button><button onClick={confirmCancel} className="flex-1 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 font-bold">İptal Et</button></div></div></div>)}
                    {imagePreviewUrl && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setImagePreviewUrl(null)}><div className="bg-white dark:bg-slate-800 p-2 rounded-lg max-w-3xl max-h-[90vh] overflow-auto"><img src={imagePreviewUrl} alt="Dekont" className="max-w-full h-auto rounded" /><div className="text-center mt-2 text-sm text-slate-500 dark:text-slate-400">Kapatmak için dışarı tıklayın</div></div></div>)}
+
+                    {showUsersModal && (
+                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl border dark:border-slate-700 p-6">
+                                <div className="flex justify-between items-center mb-5 border-b border-slate-100 dark:border-slate-700 pb-4">
+                                    <h3 className="text-xl font-bold text-slate-800 dark:text-white flex items-center gap-2"><Icons.User className="w-5 h-5 text-blue-500" /> Kullanıcı ve Rol Yönetimi</h3>
+                                    <button onClick={() => setShowUsersModal(false)} className="text-slate-400 hover:text-red-500"><Icons.X /></button>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-5">
+                                    <input type="email" value={userForm.email} onChange={e => setUserForm(p => ({...p, email: e.target.value}))} placeholder="eposta@ornek.com" className="md:col-span-2 p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900" />
+                                    <select value={userForm.role} onChange={e => setUserForm(p => ({...p, role: e.target.value}))} className="p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900">
+                                        <option value="viewer">Viewer</option><option value="staff">Staff</option><option value="admin">Admin</option>
+                                    </select>
+                                    <button onClick={saveUserProfile} className={`px-4 py-2 bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white rounded-lg font-medium`}>Kaydet</button>
+                                    <input type="text" value={userForm.displayName} onChange={e => setUserForm(p => ({...p, displayName: e.target.value}))} placeholder="Ad Soyad" className="md:col-span-4 p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900" />
+                                </div>
+                                <div className="max-h-72 overflow-y-auto history-scroll border dark:border-slate-700 rounded-lg">
+                                    {Object.values(userProfiles).length === 0 ? <div className="p-4 text-sm text-slate-400 text-center">Henüz rol kaydı yok. Sabit admin e-postaları yine geçerlidir.</div> : Object.values(userProfiles).sort((a,b) => a.email.localeCompare(b.email)).map(profile => (
+                                        <div key={profile.email} className="flex items-center justify-between gap-3 p-3 border-b last:border-0 dark:border-slate-700">
+                                            <div><div className="font-medium text-slate-800 dark:text-slate-200">{profile.displayName || profile.email}</div><div className="text-xs text-slate-500">{profile.email}</div></div>
+                                            <div className="flex items-center gap-2"><span className={`text-xs font-bold px-2 py-1 rounded-full ${profile.role === 'admin' ? 'bg-blue-100 text-blue-700' : (profile.role === 'staff' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600')}`}>{profile.role}</span><button onClick={() => setUserForm({ email: profile.email, role: profile.role || 'viewer', displayName: profile.displayName || '' })} className="p-1.5 text-slate-400 hover:text-blue-600"><Icons.Pencil className="w-4 h-4" /></button><button onClick={() => removeUserProfile(profile.email)} className="p-1.5 text-slate-400 hover:text-red-600"><Icons.Trash2 className="w-4 h-4" /></button></div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {showReportModal && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -926,6 +1110,12 @@
                     )}
 
                     <div className="max-w-6xl mx-auto space-y-6">
+                        {isAdmin && shouldShowBackupReminder() && (
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                                <div className="flex items-center gap-2 text-sm font-medium"><Icons.AlertCircle className="w-5 h-5" /> Son JSON yedeği {getLastBackupDate() ? `${getLastBackupDate()} tarihinde` : 'henüz'} alındı. Yedek almanız önerilir.</div>
+                                <button onClick={backupJSON} className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2"><Icons.FileJson className="w-4 h-4" /> Yedek Al</button>
+                            </div>
+                        )}
                         {/* --- MODERNİZE EDİLMİŞ ÜST BİLGİ VE MENÜ KISMI --- */}
                         <div className="relative overflow-hidden bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-6 rounded-2xl shadow-lg border border-slate-200/50 dark:border-slate-700/50 flex flex-col lg:flex-row items-center justify-between gap-6 transition-all duration-300">
 
@@ -958,8 +1148,8 @@
                                                 {user.email.split('@')[0]}
                                             </span>
                                         </div>
-                                        <span className={`text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 rounded-full shadow-sm ${isAdmin ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white' : 'bg-gradient-to-r from-green-500 to-emerald-600 text-white'}`}>
-                                            {isAdmin ? 'YÖNETİCİ' : 'PERSONEL'}
+                                        <span className={`text-[10px] uppercase tracking-widest font-bold px-3 py-1.5 rounded-full shadow-sm ${isAdmin ? 'bg-gradient-to-r from-red-500 to-rose-600 text-white' : (getUserRole(user?.email) === 'staff' ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white' : 'bg-gradient-to-r from-slate-500 to-slate-600 text-white')}`}>
+                                            {getUserRole(user?.email)}
                                         </span>
                                     </div>
                                 </div>
@@ -991,6 +1181,7 @@
 
                                     {isAdmin && (
                                         <>
+                                            <button onClick={() => setShowUsersModal(true)} className="p-2.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-sm hover:shadow" title="Kullanıcı Yönetimi"><Icons.User className="w-4 h-4" /></button>
                                             <input type="file" ref={uploadFileInputRef} onChange={handleJsonUpload} accept=".json" className="hidden" />
                                             <button onClick={() => uploadFileInputRef.current.click()} className="p-2.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-sm hover:shadow" title="Yedek Yükle (Restore)"><Icons.Upload className="w-4 h-4" /></button>
                                         </>
@@ -1006,6 +1197,29 @@
 
                     {viewMode === 'dashboard' && (
                             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                                    <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                        <div className="text-sm text-slate-500 dark:text-slate-400 font-semibold mb-1">Bugünkü Kasa</div>
+                                        <div className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(dailyCashSummary.total)}</div>
+                                        <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                                            <div className="bg-slate-50 dark:bg-slate-900 p-2 rounded"><div className="text-slate-400">Adet</div><div className="font-bold">{dailyCashSummary.count}</div></div>
+                                            <div className="bg-green-50 dark:bg-green-900/20 p-2 rounded"><div className="text-green-600">Teslim</div><div className="font-bold">{formatCurrency(dailyCashSummary.delivered).replace(',00', '')}</div></div>
+                                            <div className="bg-orange-50 dark:bg-orange-900/20 p-2 rounded"><div className="text-orange-600">Bekleyen</div><div className="font-bold">{formatCurrency(dailyCashSummary.pending).replace(',00', '')}</div></div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                        <div className="text-sm text-slate-500 dark:text-slate-400 font-semibold mb-3">Günlük Ofis Kırılımı</div>
+                                        <div className="space-y-2 max-h-28 overflow-y-auto history-scroll">
+                                            {Object.entries(dailyCashSummary.byOffice).length ? Object.entries(dailyCashSummary.byOffice).sort(([,a], [,b]) => b-a).map(([office, amount]) => <div key={office} className="flex justify-between text-sm"><span>{office}</span><strong>{formatCurrency(amount)}</strong></div>) : <div className="text-sm text-slate-400">Bugün kayıt yok.</div>}
+                                        </div>
+                                    </div>
+                                    <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                        <div className="text-sm text-slate-500 dark:text-slate-400 font-semibold mb-3">İptal Nedenleri</div>
+                                        <div className="space-y-2 max-h-28 overflow-y-auto history-scroll">
+                                            {Object.entries(cancellationSummary).length ? Object.entries(cancellationSummary).sort(([,a], [,b]) => b-a).map(([reason, count]) => <div key={reason} className="flex justify-between gap-3 text-sm"><span className="truncate">{reason}</span><strong>{count}</strong></div>) : <div className="text-sm text-slate-400">İptal kaydı yok.</div>}
+                                        </div>
+                                    </div>
+                                </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className={`bg-gradient-to-br from-${themeColor}-500 to-${themeColor}-600 rounded-xl p-6 text-white shadow-lg shadow-${themeColor}-200 dark:shadow-none`}>
                                         <div className={`text-${themeColor}-100 text-sm font-medium mb-1`}>Toplam Ciro (Aktif)</div>
@@ -1136,6 +1350,19 @@
                                         </div>
                                     </div>
                                 </div>
+                                {isAdmin && (
+                                    <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                                        <h3 className="font-bold text-slate-700 dark:text-slate-200 flex items-center gap-2 mb-4"><Icons.History className="w-5 h-5 text-slate-400" /> Son Denetim Kayıtları</h3>
+                                        <div className="divide-y divide-slate-100 dark:divide-slate-700 max-h-72 overflow-y-auto history-scroll">
+                                            {auditLogs.length ? auditLogs.slice(0, 25).map(log => (
+                                                <div key={log.id} className="py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-1 text-sm">
+                                                    <div><span className="font-semibold text-slate-800 dark:text-slate-200">{log.action}</span>{log.receiptNo && <span className="ml-2 font-mono text-xs text-slate-400">#{log.receiptNo}</span>}<div className="text-xs text-slate-500">{log.user}</div></div>
+                                                    <div className="text-xs text-slate-400 font-mono">{formatDateTimeTR(log.createdAt)}</div>
+                                                </div>
+                                            )) : <div className="py-6 text-center text-sm text-slate-400">Henüz audit log yok.</div>}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
 
@@ -1275,7 +1502,7 @@
 
                     {viewMode === 'list' && (
                         <>
-                            {isAdmin && (
+                            {canEditEntries() && (
                             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                                 <h2 className="text-lg font-semibold mb-4 text-slate-700 dark:text-slate-200 flex items-center gap-2"><Icons.PlusCircle className="w-5 h-5" /> Yeni Kayıt Ekle</h2>
                                 <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
@@ -1334,6 +1561,27 @@
                                                 {OFFICES.map(off => <option key={off} value={off}>{off}</option>)}
                                             </select>
                                         </div>
+                                        <div className="flex items-center bg-white dark:bg-slate-900 p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                                            <span className="text-xs text-slate-400 font-medium px-2">Dekont</span>
+                                            <select value={attachmentFilter} onChange={(e) => setAttachmentFilter(e.target.value)} className="text-sm border-none outline-none text-slate-600 dark:text-slate-300 bg-transparent cursor-pointer max-w-[100px]">
+                                                <option value="all">Tümü</option><option value="with">Var</option><option value="without">Yok</option>
+                                            </select>
+                                        </div>
+                                        <div className="flex items-center bg-white dark:bg-slate-900 p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                                            <span className="text-xs text-slate-400 font-medium px-2">Tutar</span>
+                                            <input type="number" min="0" value={amountFilter.min} onChange={e => setAmountFilter(p => ({...p, min: e.target.value}))} placeholder="Min" className="w-16 text-sm border-none outline-none bg-transparent" />
+                                            <span className="text-slate-300">-</span>
+                                            <input type="number" min="0" value={amountFilter.max} onChange={e => setAmountFilter(p => ({...p, max: e.target.value}))} placeholder="Max" className="w-16 text-sm border-none outline-none bg-transparent" />
+                                        </div>
+                                        {isAdmin && (
+                                            <div className="flex items-center bg-white dark:bg-slate-900 p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
+                                                <span className="text-xs text-slate-400 font-medium px-2">Oluşturan</span>
+                                                <select value={creatorFilter} onChange={(e) => setCreatorFilter(e.target.value)} className="text-sm border-none outline-none text-slate-600 dark:text-slate-300 bg-transparent cursor-pointer max-w-[130px]">
+                                                    <option value="all">Tümü</option>
+                                                    {[...new Set(entries.filter(e => !e.isDeleted && e.createdBy).map(e => e.createdBy))].sort().map(email => (<option key={email} value={email}>{email}</option>))}
+                                                </select>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <button onClick={() => setShowReportModal(true)} className={`px-3 py-2 rounded-md text-sm font-medium bg-${themeColor}-100 text-${themeColor}-700 dark:bg-${themeColor}-900/30 dark:text-${themeColor}-300 hover:bg-${themeColor}-200 flex items-center gap-1 transition-colors shadow-sm`} title="Detaylı Rapor Al"><Icons.TrendingUp className="w-4 h-4" /> Raporla</button>
