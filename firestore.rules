@@ -1,0 +1,75 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.email in [
+        "admin@demo.com",
+        "yonetici@sirket.com",
+        "oguzhanarslan4607@gmail.com"
+      ];
+    }
+
+    function validStatus(status) {
+      return status in ["Teslim Edildi", "Teslim Edilmedi", "İptal"];
+    }
+
+    function validEntry(data) {
+      return data.keys().hasAll([
+          "receiptNo",
+          "date",
+          "staffName",
+          "customerName",
+          "amount",
+          "status",
+          "createdAt",
+          "createdBy",
+          "isDeleted"
+        ])
+        && data.keys().hasOnly([
+          "receiptNo",
+          "date",
+          "staffName",
+          "office",
+          "customerName",
+          "customerPhone",
+          "amount",
+          "image",
+          "note",
+          "status",
+          "history",
+          "createdAt",
+          "createdBy",
+          "isDeleted"
+        ])
+        && data.receiptNo is string
+        && data.date is string
+        && data.staffName is string
+        && data.customerName is string
+        && data.amount is number
+        && data.amount > 0
+        && validStatus(data.status)
+        && data.createdAt is string
+        && data.createdBy is string
+        && data.isDeleted is bool;
+    }
+
+    match /pesinatlar/{entryId} {
+      allow read: if signedIn();
+      allow create, update: if isAdmin() && validEntry(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /_meta/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

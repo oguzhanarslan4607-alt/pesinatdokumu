@@ -1,7 +1,9 @@
-const CACHE_NAME = 'pesinat-takip-v1';
+const CACHE_NAME = 'pesinat-takip-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
+  '/manifest.json',
+  '/icon.svg',
   'https://cdn.tailwindcss.com',
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -38,11 +40,11 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   // Firebase ve Firestore API isteklerini cache'lememek için (Canlı verinin bozulmaması için)
-  if (event.request.url.includes('firestore.googleapis.com') || 
+  if (event.request.url.includes('firestore.googleapis.com') ||
       event.request.url.includes('firebase')) {
     return;
   }
-  
+
   event.respondWith(
     caches.match(event.request).then((response) => {
       // Cache'de varsa onu döndür, yoksa internetten çek

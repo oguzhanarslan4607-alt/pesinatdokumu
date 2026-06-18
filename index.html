@@ -4,12 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Peşinat Takip ve Raporlama</title>
-    
+
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#2563eb">
+    <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2942/2942544.png">
-    
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -32,13 +33,13 @@
             ]
         }
     </script>
-    
+
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone@7.24.4/babel.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; user-select: none; -webkit-tap-highlight-color: transparent; }
@@ -62,7 +63,7 @@
 
     <script type="text/babel" data-type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, collection, addDoc, onSnapshot, doc, deleteDoc, updateDoc, query, orderBy, writeBatch } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, deleteDoc, updateDoc, query, writeBatch, runTransaction } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
         // =================================================================
@@ -77,12 +78,12 @@
             measurementId: "G-XX93ZSFYK2"
         };
         const ADMIN_EMAILS = [
-            "admin@demo.com", 
+            "admin@demo.com",
             "yonetici@sirket.com",
             "oguzhanarslan4607@gmail.com"
         ];
         const OFFICES = [
-            "Asena", "Asrın", "Dağıtım", "Efsane", "Elbistan", "Merkez Aktif", "Star", 
+            "Asena", "Asrın", "Dağıtım", "Efsane", "Elbistan", "Merkez Aktif", "Star",
             "Altın Ofis", "Ateş Ofis", "Tomris Ofis"
         ];
         // *** OFİS MÜDÜRÜ TELEFONLARI ***
@@ -104,9 +105,11 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
         const DB_COLLECTION = "pesinatlar";
+        const META_COLLECTION = "_meta";
+        const RECEIPT_COUNTER_DOC = "receiptCounter";
 
         const { useState, useEffect, useRef, useMemo } = React;
-        
+
         const ICON_PATHS = {
             'trash-2': <><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></>,
             'plus-circle': <><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></>,
@@ -198,9 +201,9 @@
             CalendarCheck: (p) => <LineIcon name="calendar-check" {...p} />,
             StickyNote: (p) => <LineIcon name="sticky-note" {...p} />,
             BrandWhatsapp: (p) => <Icon name="brand-whatsapp" viewBox="0 0 28 28" {...p} />,
-            BuildingWhatsapp: (p) => <LineIcon name="building-2" {...p} /> 
+            BuildingWhatsapp: (p) => <LineIcon name="building-2" {...p} />
         };
-        
+
         function MainApp() {
             const [user, setUser] = useState(null);
             const [isAdmin, setIsAdmin] = useState(false);
@@ -213,7 +216,7 @@
             const [isLoading, setIsLoading] = useState(true);
             const [viewMode, setViewMode] = useState('list');
             const [searchTerm, setSearchTerm] = useState('');
-			
+
             // --- FİLTRELEME STATE'LERİ ---
             const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
             const [statusFilter, setStatusFilter] = useState('all');
@@ -224,7 +227,7 @@
 			// --- SAYFALAMA AYARLARI ---
             const [currentPage, setCurrentPage] = useState(1);
             const [itemsPerPage, setItemsPerPage] = useState(50);
-            
+
             // --- YENİ EKLENEN TAKVİM AYLIK TOPLAM STATE'İ ---
             const [monthTotal, setMonthTotal] = useState(null);
 
@@ -244,13 +247,20 @@
             const [themeColor, setThemeColor] = useState(() => localStorage.getItem('color') || 'blue');
             const themeHex = { blue: '#3b82f6', emerald: '#10b981', violet: '#8b5cf6', amber: '#f59e0b', purple: '#9333ea' };
             const darkThemeHex = { blue: '#2563eb', emerald: '#059669', violet: '#7c3aed', amber: '#d97706', purple: '#7e22ce' };
-            
+
             useEffect(() => {
-                window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); setInstallPrompt(e); });
-                if (darkMode) { document.documentElement.classList.add('dark'); localStorage.setItem('theme', 'dark'); } 
+                if (darkMode) { document.documentElement.classList.add('dark'); localStorage.setItem('theme', 'dark'); }
                 else { document.documentElement.classList.remove('dark'); localStorage.setItem('theme', 'light'); }
             }, [darkMode]);
             useEffect(() => { localStorage.setItem('color', themeColor); }, [themeColor]);
+            useEffect(() => {
+                const handleBeforeInstall = (e) => { e.preventDefault(); setInstallPrompt(e); };
+                window.addEventListener('beforeinstallprompt', handleBeforeInstall);
+                if ('serviceWorker' in navigator) {
+                    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(console.error));
+                }
+                return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstall);
+            }, []);
 
             const handleInstallClick = () => {
                 if (!installPrompt) return;
@@ -261,10 +271,106 @@
             const getTurkeyDate = () => {
                 return new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' });
             };
+            const addDaysToTurkeyDate = (dateStr, days) => {
+                const [year, month, day] = dateStr.split('-').map(Number);
+                const utcDate = new Date(Date.UTC(year, month - 1, day + days, 12));
+                return utcDate.toLocaleDateString('en-CA', { timeZone: 'Europe/Istanbul' });
+            };
+            const getTurkeyMonth = () => getTurkeyDate().slice(0, 7);
+            const formatDateTR = (dateStr) => dateStr ? new Date(`${dateStr}T12:00:00`).toLocaleDateString('tr-TR') : '-';
+            const formatDateTimeTR = (dateStr) => dateStr ? new Date(dateStr).toLocaleString('tr-TR', { timeZone: 'Europe/Istanbul' }) : '-';
+            const formatMonthTR = (date) => date.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric', timeZone: 'Europe/Istanbul' });
+            const formatReceiptNo = (num) => String(num).padStart(6, '0');
+            const parseReceiptNo = (value) => {
+                const parsed = parseInt(value || "0", 10);
+                return Number.isFinite(parsed) ? parsed : 0;
+            };
+            const isAdminEmail = (email) => ADMIN_EMAILS.includes((email || '').toLowerCase());
+            const requireAdmin = () => {
+                if (!isAdmin || !user || !isAdminEmail(user.email)) {
+                    alert("Bu işlem için yönetici yetkisi gerekir.");
+                    return false;
+                }
+                return true;
+            };
+            const toValidAmount = (value) => {
+                const amount = Number(value);
+                return Number.isFinite(amount) && amount > 0 ? amount : null;
+            };
+            const getMaxReceiptNoFromEntries = (list) => list.reduce((max, entry) => Math.max(max, parseReceiptNo(entry.receiptNo)), 0);
+            const normalizeSearch = (value) => (value || '').toString().toLocaleLowerCase('tr-TR');
+            const escapeHtml = (value) => (value ?? '').toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+            const createEntryWithReceipt = async (entryData) => {
+                return runTransaction(db, async (transaction) => {
+                    const counterRef = doc(db, META_COLLECTION, RECEIPT_COUNTER_DOC);
+                    const counterSnap = await transaction.get(counterRef);
+                    const currentNo = Math.max(
+                        counterSnap.exists() ? Number(counterSnap.data().lastReceiptNo || 0) : 0,
+                        getMaxReceiptNoFromEntries(entries)
+                    );
+                    const nextNo = currentNo + 1;
+                    const receiptNo = formatReceiptNo(nextNo);
+                    const entryRef = doc(collection(db, DB_COLLECTION));
+                    transaction.set(counterRef, {
+                        lastReceiptNo: nextNo,
+                        updatedAt: new Date().toISOString(),
+                        updatedBy: user.email
+                    }, { merge: true });
+                    transaction.set(entryRef, { ...entryData, receiptNo });
+                    return receiptNo;
+                });
+            };
+            const syncReceiptCounterAtLeast = async (receiptNo) => {
+                const minNo = parseReceiptNo(receiptNo);
+                if (!minNo) return;
+                await runTransaction(db, async (transaction) => {
+                    const counterRef = doc(db, META_COLLECTION, RECEIPT_COUNTER_DOC);
+                    const counterSnap = await transaction.get(counterRef);
+                    const currentNo = counterSnap.exists() ? Number(counterSnap.data().lastReceiptNo || 0) : 0;
+                    if (minNo > currentNo) {
+                        transaction.set(counterRef, {
+                            lastReceiptNo: minNo,
+                            updatedAt: new Date().toISOString(),
+                            updatedBy: user.email
+                        }, { merge: true });
+                    }
+                });
+            };
+            const normalizeBackupEntry = (item) => {
+                if (!item || typeof item !== 'object') throw new Error("Geçersiz kayıt bulundu.");
+                const amount = toValidAmount(item.amount);
+                if (!amount) throw new Error(`${item.receiptNo || 'Bilinmeyen'} numaralı kayıtta tutar geçersiz.`);
+                if (!item.receiptNo || !item.date || !item.staffName || !item.customerName) {
+                    throw new Error(`${item.receiptNo || 'Bilinmeyen'} numaralı kayıtta zorunlu alan eksik.`);
+                }
+                const { id, original, ...rest } = item;
+                return {
+                    ...rest,
+                    receiptNo: item.receiptNo.toString().trim(),
+                    date: item.date,
+                    staffName: item.staffName.toString().trim(),
+                    office: (item.office || '').toString().trim(),
+                    customerName: item.customerName.toString().trim(),
+                    customerPhone: (item.customerPhone || '').toString().trim(),
+                    amount,
+                    status: ['Teslim Edildi', 'Teslim Edilmedi', 'İptal'].includes(item.status) ? item.status : 'Teslim Edilmedi',
+                    history: Array.isArray(item.history) ? item.history : [],
+                    createdAt: item.createdAt || new Date().toISOString(),
+                    createdBy: item.createdBy || user.email,
+                    isDeleted: Boolean(item.isDeleted),
+                    note: item.note || '',
+                    image: item.image || null
+                };
+            };
 
             const [formData, setFormData] = useState({
-                receiptNo: '000001', 
-                date: getTurkeyDate(), 
+                receiptNo: '000001',
+                date: getTurkeyDate(),
                 staffName: '', office: '', customerName: '', customerPhone: '', amount: '', image: null, note: ''
             });
             const fileInputRef = useRef(null);
@@ -275,9 +381,10 @@
             useEffect(() => {
                 const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
                     setUser(currentUser);
-                    if (currentUser) { setLoginError(''); setIsAdmin(ADMIN_EMAILS.includes(currentUser.email)); }
+                    if (currentUser) { setLoginError(''); setIsAdmin(isAdminEmail(currentUser.email)); }
+                    else { setIsAdmin(false); }
                 });
-               
+
                 return () => unsubscribe();
             }, []);
             useEffect(() => {
@@ -286,8 +393,8 @@
                 const unsubscribe = onSnapshot(q, (snapshot) => {
                     const loadedData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     loadedData.sort((a, b) => {
-                        const numA = parseInt(a.receiptNo || "0", 10);
-                        const numB = parseInt(b.receiptNo || "0", 10);
+                        const numA = parseReceiptNo(a.receiptNo);
+                        const numB = parseReceiptNo(b.receiptNo);
                         return numB - numA;
                     });
                     setEntries(loadedData);
@@ -298,16 +405,10 @@
             useEffect(() => {
                 if (!formData.staffName && !formData.amount && !formData.customerName) {
                     let maxReceiptNo = 0;
-                    const activeEntries = entries.filter(e => !e.isDeleted);
-                    if (activeEntries.length > 0) {
-                        activeEntries.forEach(entry => {
-                            const num = parseInt(entry.receiptNo || "0", 10);
-                            if (!isNaN(num) && num > maxReceiptNo) maxReceiptNo = num;
-                        });
-                    }
-                    const nextNo = (maxReceiptNo + 1).toString().padStart(6, '0');
+                    maxReceiptNo = getMaxReceiptNoFromEntries(entries);
+                    const nextNo = formatReceiptNo(maxReceiptNo + 1);
                     setFormData(prev => ({ ...prev, receiptNo: nextNo }));
-            
+
                 }
             }, [entries, formData.staffName, formData.amount, formData.customerName]);
             const handleLogin = async (e) => {
@@ -326,7 +427,7 @@
                     const img = new Image();
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 600; 
+                        const MAX_WIDTH = 600;
                         let width = img.width; let height = img.height;
                         if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH;
                         }
@@ -334,7 +435,7 @@
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        callback(canvas.toDataURL('image/jpeg', 0.3)); 
+                        callback(canvas.toDataURL('image/jpeg', 0.3));
                     };
                     img.src = e.target.result;
                 };
@@ -350,12 +451,12 @@
                 let phone = rawPhone.replace(/\D/g, '');
                 if (phone.startsWith('0')) { phone = phone.substring(1); }
                 if (phone.length === 10) { phone = '90' + phone; }
-                
+
                 const message = `Bilgilendirme: ${customerName} isimli müşteriden ${formatCurrency(amount).replace('₺', 'TL')} peşinat ödemesi alınmıştır.`;
-                
+
                 // MASAÜSTÜ İÇİN GÜNCELLENMİŞ WHATSAPP PROTOKOLÜ
                 const url = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`;
-                
+
                 const link = document.createElement('a');
                 link.href = url;
                 document.body.appendChild(link);
@@ -365,25 +466,28 @@
 
             const handleSubmit = async (e) => {
                 e.preventDefault();
-                if (!formData.staffName || !formData.amount) return;
+                if (!requireAdmin()) return;
+                const amount = toValidAmount(formData.amount);
+                if (!amount) return alert("Tutar 0'dan büyük olmalıdır.");
+                if (!formData.staffName || !formData.customerName || !formData.date) return alert("Personel, müşteri ve tarih zorunludur.");
                 try {
-                    const newEntry = { ...formData, amount: parseFloat(formData.amount), status: 'Teslim Edilmedi', history: [], createdAt: new Date().toISOString(), createdBy: user.email, isDeleted: false };
-                    await addDoc(collection(db, DB_COLLECTION), newEntry);
-                    
+                    const newEntry = { ...formData, amount, status: 'Teslim Edilmedi', history: [], createdAt: new Date().toISOString(), createdBy: user.email, isDeleted: false };
+                    const receiptNo = await createEntryWithReceipt(newEntry);
+
                     if(OFFICE_PHONES[formData.office]) {
                         if(confirm(`Kayıt Başarılı.\n${formData.office} ofis müdürüne bildirim gönderilsin mi?`)) {
                             sendManagerWhatsapp(formData.office, formData.customerName, formData.amount);
                         }
                     }
 
-                    const currentNo = parseInt(formData.receiptNo || "0", 10);
-                    const nextNo = (currentNo + 1).toString().padStart(6, '0');
+                    const nextNo = formatReceiptNo(parseReceiptNo(receiptNo) + 1);
                     setFormData({ receiptNo: nextNo, date: getTurkeyDate(), staffName: '', office: '', customerName: '', customerPhone: '', amount: '', image: null, note: '' });
                     if (fileInputRef.current) fileInputRef.current.value = "";
                 } catch (error) { alert("Hata: " + error.message);
                 }
             };
             const confirmSoftDelete = async () => {
+                if (!requireAdmin()) return;
                 try {
                     const historyEntry = { updatedAt: new Date().toISOString(), action: 'Çöp Kutusuna Taşındı', user: user.email };
                     await updateDoc(doc(db, DB_COLLECTION, deleteConfirmId), { isDeleted: true, history: [...(entries.find(e => e.id === deleteConfirmId)?.history || []), historyEntry] });
@@ -391,12 +495,14 @@
                 } catch (error) { alert("Silinemedi: " + error.message); }
             };
             const handleRestore = async (id) => {
+                if (!requireAdmin()) return;
                 try {
                     const historyEntry = { updatedAt: new Date().toISOString(), action: 'Çöp Kutusundan Geri Yüklendi', user: user.email };
                     await updateDoc(doc(db, DB_COLLECTION, id), { isDeleted: false, history: [...(entries.find(e => e.id === id)?.history || []), historyEntry] });
                 } catch (error) { alert("Geri yüklenemedi: " + error.message); }
             };
             const confirmPermanentDelete = async () => {
+                if (!requireAdmin()) return;
                 try {
                     await deleteDoc(doc(db, DB_COLLECTION, permanentDeleteId));
                     setPermanentDeleteId(null);
@@ -404,13 +510,15 @@
             };
             const saveEdit = async () => {
                 if (!editingItem) return;
+                if (!requireAdmin()) return;
+                const amount = toValidAmount(editingItem.amount);
+                if (!amount) return alert("Tutar 0'dan büyük olmalıdır.");
                 try {
                     const changes = [];
                     const oldData = editingItem.original;
                     const newData = editingItem;
-                    const formatDate = (d) => new Date(d).toLocaleDateString('tr-TR');
                     if (oldData.receiptNo !== newData.receiptNo) changes.push(`Makbuz: ${oldData.receiptNo} -> ${newData.receiptNo}`);
-                    if (oldData.date !== newData.date) changes.push(`Tarih: ${formatDate(oldData.date)} -> ${formatDate(newData.date)}`);
+                    if (oldData.date !== newData.date) changes.push(`Tarih: ${formatDateTR(oldData.date)} -> ${formatDateTR(newData.date)}`);
                     if (parseFloat(oldData.amount) !== parseFloat(newData.amount)) changes.push(`Tutar: ${formatCurrency(oldData.amount)} -> ${formatCurrency(newData.amount)}`);
                     if (oldData.staffName !== newData.staffName) changes.push(`Personel: ${oldData.staffName} -> ${newData.staffName}`);
                     if (oldData.customerName !== newData.customerName) changes.push(`Müşteri: ${oldData.customerName} -> ${newData.customerName}`);
@@ -422,14 +530,14 @@
                     const actionText = changes.length > 0 ?
                         changes.join(', ') : 'Düzenleme yapıldı';
                     const historyEntry = { updatedAt: new Date().toISOString(), action: actionText, user: user.email };
-                    const updateData = { ...editingItem, amount: parseFloat(editingItem.amount), history: [...(editingItem.history || []), historyEntry] };
+                    const updateData = { ...editingItem, amount, history: [...(editingItem.history || []), historyEntry] };
                     delete updateData.original;
                     await updateDoc(doc(db, DB_COLLECTION, editingItem.id), updateData);
                     setEditingItem(null);
                 } catch (error) { alert("Güncellenemedi: " + error.message); }
             };
             const toggleStatus = async (entry) => {
-                if (!isAdmin) return;
+                if (!requireAdmin()) return;
                 const nextStatus = entry.status === 'Teslim Edildi' ? 'Teslim Edilmedi' : 'Teslim Edildi';
                 if (!window.confirm(`"${entry.customerName}" adlı müşterinin durumunu "${nextStatus}" olarak değiştirmek istediğinize emin misiniz?`)) return;
                 try {
@@ -440,7 +548,7 @@
             };
 
             const handleCancel = async (entry) => {
-                if (!isAdmin) return;
+                if (!requireAdmin()) return;
                 if (!window.confirm(`"${entry.customerName}" işlemini İPTAL etmek istediğinize emin misiniz?\nBu işlem cirodan düşülecektir.`)) return;
                 try {
                     const historyEntry = { updatedAt: new Date().toISOString(), action: 'İşlem İptal Edildi', user: user.email };
@@ -456,14 +564,14 @@
                 let phone = entry.customerPhone.replace(/\D/g, '');
                 if (phone.startsWith('0')) { phone = phone.substring(1); }
                 if (phone.length === 10) { phone = '90' + phone; }
-                
-                const formattedDate = new Date(entry.date).toLocaleDateString('tr-TR');
+
+                const formattedDate = formatDateTR(entry.date);
                 const formattedAmount = formatCurrency(entry.amount).replace('₺', 'TL');
                 const message = `Sayın ${entry.customerName}, ${formattedDate} tarihli ${formattedAmount} tutarındaki peşinat ödemeniz alınmıştır. Makbuz No: ${entry.receiptNo}. Teşekkür ederiz.`;
-                
+
                 // MASAÜSTÜ İÇİN GÜNCELLENMİŞ WHATSAPP PROTOKOLÜ
                 const url = `whatsapp://send?phone=${phone}&text=${encodeURIComponent(message)}`;
-                
+
                 const link = document.createElement('a');
                 link.href = url;
                 document.body.appendChild(link);
@@ -478,7 +586,7 @@
                 const trToEn = (str) => { if(!str) return ""; return str.toString().replace(/Ğ/g, "G").replace(/ğ/g, "g").replace(/Ü/g, "U").replace(/ü/g, "u").replace(/Ş/g, "S").replace(/ş/g, "s").replace(/İ/g, "I").replace(/ı/g, "i").replace(/Ö/g, "O").replace(/ö/g, "o").replace(/Ç/g, "C").replace(/ç/g, "c");
                 };
                 const title = "TAHSILAT MAKBUZU";
-                const dateStr = new Date(entry.date).toLocaleDateString('tr-TR');
+                const dateStr = formatDateTR(entry.date);
                 doc.setLineWidth(0.5); doc.rect(10, 10, 190, 128);
                 doc.setFontSize(22); doc.setTextColor(26, 86, 219);
                 doc.text(title, 105, 25, null, null, "center");
@@ -510,31 +618,31 @@
 
             const printReceipt = (entry) => {
                 const printWindow = window.open('', '', 'width=800,height=600');
-                const formattedDate = new Date(entry.date).toLocaleDateString('tr-TR');
+                const formattedDate = formatDateTR(entry.date);
                 const formattedAmount = formatCurrency(entry.amount);
-                const htmlContent = `<html><head><title>Tahsilat Makbuzu</title><style>body{font-family:'Helvetica',sans-serif;padding:40px;color:#333}.receipt-box{border:2px solid #333;padding:30px;max-width:700px;margin:0 auto;position:relative}.header{display:flex;justify-content:space-between;border-bottom:2px solid #eee;padding-bottom:20px;margin-bottom:20px}.title{font-size:24px;font-weight:bold;color:#1a56db}.row{display:flex;margin-bottom:15px}.label{width:150px;font-weight:bold;color:#555}.value{flex:1;border-bottom:1px dotted #ccc}.amount-box{margin-top:30px;text-align:right;font-size:28px;font-weight:bold;color:#1a56db}.footer{margin-top:50px;display:flex;justify-content:space-between;font-size:12px;text-align:center}.sign-box{width:200px;border-top:1px solid #333;padding-top:10px}.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:100px;opacity:0.05;font-weight:bold;pointer-events:none}</style></head><body><div class="receipt-box"><div class="watermark">TAHSİLAT</div><div class="header"><div><div class="title">TAHSİLAT MAKBUZU</div></div><div style="text-align:right"><div>No: <strong>${entry.receiptNo}</strong></div><div>Tarih: <strong>${formattedDate}</strong></div></div></div><div class="content"><div class="row"><div class="label">Sayın:</div><div class="value">${entry.customerName}</div></div>${entry.customerPhone ?
-                `<div class="row"><div class="label">Telefon:</div><div class="value">${entry.customerPhone}</div></div>` : ''}<div class="row"><div class="label">Ofis:</div><div class="value">${entry.office ||
-                '-'}</div></div><div class="row"><div class="label">Tutar:</div><div class="value">${formattedAmount}</div></div><div class="row"><div class="label">Tahsil Eden:</div><div class="value">${entry.staffName}</div></div></div><div class="amount-box">${formattedAmount}</div><div class="footer"><div class="sign-box">Teslim Eden (İmza)</div><div class="sign-box">Teslim Alan<br>${entry.staffName}</div></div></div><script>window.onload=function(){window.print()}<\/script></body></html>`;
+                const htmlContent = `<html><head><title>Tahsilat Makbuzu</title><style>body{font-family:'Helvetica',sans-serif;padding:40px;color:#333}.receipt-box{border:2px solid #333;padding:30px;max-width:700px;margin:0 auto;position:relative}.header{display:flex;justify-content:space-between;border-bottom:2px solid #eee;padding-bottom:20px;margin-bottom:20px}.title{font-size:24px;font-weight:bold;color:#1a56db}.row{display:flex;margin-bottom:15px}.label{width:150px;font-weight:bold;color:#555}.value{flex:1;border-bottom:1px dotted #ccc}.amount-box{margin-top:30px;text-align:right;font-size:28px;font-weight:bold;color:#1a56db}.footer{margin-top:50px;display:flex;justify-content:space-between;font-size:12px;text-align:center}.sign-box{width:200px;border-top:1px solid #333;padding-top:10px}.watermark{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-45deg);font-size:100px;opacity:0.05;font-weight:bold;pointer-events:none}</style></head><body><div class="receipt-box"><div class="watermark">TAHSİLAT</div><div class="header"><div><div class="title">TAHSİLAT MAKBUZU</div></div><div style="text-align:right"><div>No: <strong>${escapeHtml(entry.receiptNo)}</strong></div><div>Tarih: <strong>${escapeHtml(formattedDate)}</strong></div></div></div><div class="content"><div class="row"><div class="label">Sayın:</div><div class="value">${escapeHtml(entry.customerName)}</div></div>${entry.customerPhone ?
+                `<div class="row"><div class="label">Telefon:</div><div class="value">${escapeHtml(entry.customerPhone)}</div></div>` : ''}<div class="row"><div class="label">Ofis:</div><div class="value">${escapeHtml(entry.office ||
+                '-')}</div></div><div class="row"><div class="label">Tutar:</div><div class="value">${escapeHtml(formattedAmount)}</div></div><div class="row"><div class="label">Tahsil Eden:</div><div class="value">${escapeHtml(entry.staffName)}</div></div></div><div class="amount-box">${escapeHtml(formattedAmount)}</div><div class="footer"><div class="sign-box">Teslim Eden (İmza)</div><div class="sign-box">Teslim Alan<br>${escapeHtml(entry.staffName)}</div></div></div><script>window.onload=function(){window.print()}<\/script></body></html>`;
                 printWindow.document.write(htmlContent); printWindow.document.close();
             };
             const exportToExcel = () => {
                 if (entries.length === 0) return alert("Dışa aktarılacak veri yok.");
                 if (!window.XLSX) { return alert("Excel kütüphanesi yükleniyor..."); }
                 const dataToExport = entries.filter(e => !e.isDeleted).map(entry => ({
-                    "Makbuz No": entry.receiptNo, "Tarih": new Date(entry.date).toLocaleDateString('tr-TR'),
+                    "Makbuz No": entry.receiptNo, "Tarih": formatDateTR(entry.date),
                     "Personel": entry.staffName, "Ofis": entry.office, "Müşteri": entry.customerName, "Telefon": entry.customerPhone || '',
-                    "Tutar": entry.amount, "Durum": entry.status, "Not": entry.note || '', "Oluşturulma": new Date(entry.createdAt).toLocaleString('tr-TR'), "Oluşturan": entry.createdBy
+                    "Tutar": entry.amount, "Durum": entry.status, "Not": entry.note || '', "Oluşturulma": formatDateTimeTR(entry.createdAt), "Oluşturan": entry.createdBy
                 }));
                 const ws = XLSX.utils.json_to_sheet(dataToExport);
                 const wb = XLSX.utils.book_new();
                 XLSX.utils.book_append_sheet(wb, ws, "Pesinatlar");
-                XLSX.writeFile(wb, `Pesinat_Listesi_${new Date().toISOString().slice(0,10)}.xlsx`);
+                XLSX.writeFile(wb, `Pesinat_Listesi_${getTurkeyDate()}.xlsx`);
             };
 
             const backupJSON = () => {
-                if (!isAdmin) return;
+                if (!requireAdmin()) return;
                 if (entries.length === 0) return alert("Yedeklenecek veri yok.");
-                
+
                 const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(entries, null, 2));
                 const downloadAnchorNode = document.createElement('a');
                 downloadAnchorNode.setAttribute("href", dataStr);
@@ -543,8 +651,9 @@
                 downloadAnchorNode.click();
                 downloadAnchorNode.remove();
             };
-            
+
             const handleJsonUpload = (e) => {
+                if (!requireAdmin()) return;
                 const file = e.target.files[0];
                 if (!file) return;
 
@@ -553,12 +662,22 @@
                     try {
                         const data = JSON.parse(event.target.result);
                         if (!Array.isArray(data)) throw new Error("Geçersiz dosya formatı. Liste bekleniyor.");
+                        const existingReceiptNos = new Set(entries.map(item => item.receiptNo));
+                        const importReceiptNos = new Set();
+                        const normalizedData = data.map(normalizeBackupEntry);
+                        const highestImportedReceiptNo = normalizedData.reduce((max, item) => Math.max(max, parseReceiptNo(item.receiptNo)), 0);
+                        normalizedData.forEach(item => {
+                            if (existingReceiptNos.has(item.receiptNo) || importReceiptNos.has(item.receiptNo)) {
+                                throw new Error(`${item.receiptNo} makbuz numarası zaten mevcut veya yedek içinde tekrar ediyor.`);
+                            }
+                            importReceiptNos.add(item.receiptNo);
+                        });
 
-                        if (!confirm(`${data.length} adet kayıt veritabanına eklenecek. Bu işlem biraz sürebilir.\n\nOnaylıyor musunuz?`)) return;
+                        if (!confirm(`${normalizedData.length} adet kayıt veritabanına eklenecek. Bu işlem biraz sürebilir.\n\nOnaylıyor musunuz?`)) return;
 
                         const chunks = [];
-                        while(data.length) {
-                            chunks.push(data.splice(0, 450));
+                        while(normalizedData.length) {
+                            chunks.push(normalizedData.splice(0, 450));
                         }
 
                         let totalProcessed = 0;
@@ -566,16 +685,16 @@
                             const batch = writeBatch(db);
                             chunk.forEach(item => {
                                 const newRef = doc(collection(db, DB_COLLECTION));
-                                const { id, ...itemData } = item;
-                                batch.set(newRef, itemData);
+                                batch.set(newRef, item);
                             });
                             await batch.commit();
                             totalProcessed += chunk.length;
                         }
+                        await syncReceiptCounterAtLeast(highestImportedReceiptNo);
 
                         alert(`${totalProcessed} kayıt başarıyla yüklendi!`);
                         if (uploadFileInputRef.current) uploadFileInputRef.current.value = "";
-                        
+
                     } catch (err) {
                         alert("Yükleme Hatası: " + err.message);
                     }
@@ -585,46 +704,49 @@
 
             // --- FİLTRELEME MANTIĞI ---
             const filteredEntries = entries.filter(e => !e.isDeleted).filter(e => {
-                const term = searchTerm.toLowerCase(); 
-                const status = (e.status || '').toLowerCase(); 
-                const receipt = (e.receiptNo || '').toLowerCase();
-                const phone = (e.customerPhone || '').toLowerCase();
-                
+                const term = normalizeSearch(searchTerm);
+                const status = normalizeSearch(e.status);
+                const receipt = normalizeSearch(e.receiptNo);
+                const phone = normalizeSearch(e.customerPhone);
+
                 const matchesSearch = (
-                    receipt.includes(term) || 
-                    e.staffName.toLowerCase().includes(term) || 
-                    e.customerName.toLowerCase().includes(term) || 
-                    phone.includes(term) || 
-                    (e.office || '').toLowerCase().includes(term) || 
-                    status.includes(term)
+                    receipt.includes(term) ||
+                    normalizeSearch(e.staffName).includes(term) ||
+                    normalizeSearch(e.customerName).includes(term) ||
+                    phone.includes(term) ||
+                    normalizeSearch(e.office).includes(term) ||
+                    status.includes(term) ||
+                    normalizeSearch(e.note).includes(term)
                 );
 
                 const matchesStatus = statusFilter === 'all' || e.status === statusFilter;
                 const matchesStaff = staffFilter === 'all' || e.staffName === staffFilter;
                 const matchesOffice = officeFilter === 'all' || e.office === officeFilter;
 
-                let matchesDate = true; 
-                if (dateFilter.start) matchesDate = matchesDate && e.date >= dateFilter.start; 
+                let matchesDate = true;
+                if (dateFilter.start) matchesDate = matchesDate && e.date >= dateFilter.start;
                 if (dateFilter.end) matchesDate = matchesDate && e.date <= dateFilter.end;
-                
+
                 return matchesSearch && matchesStatus && matchesStaff && matchesOffice && matchesDate;
             });
+            const filteredActiveEntries = filteredEntries.filter(e => e.status !== 'İptal');
 
             const trashEntries = entries.filter(e => e.isDeleted);
-            const indexOfLastItem = currentPage * itemsPerPage;
-            const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+            const safeItemsPerPage = Math.max(itemsPerPage, 1);
+            const indexOfLastItem = currentPage * safeItemsPerPage;
+            const indexOfFirstItem = indexOfLastItem - safeItemsPerPage;
             const currentItems = filteredEntries.slice(indexOfFirstItem, indexOfLastItem);
-            const totalPages = Math.ceil(filteredEntries.length / itemsPerPage);
-            
-            const totalAmount = filteredEntries.reduce((sum, item) => sum + (item.status === 'İptal' ? 0 : (Number(item.amount) || 0)), 0);
-            
+            const totalPages = Math.max(1, Math.ceil(filteredEntries.length / safeItemsPerPage));
+
+            const totalAmount = filteredActiveEntries.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+
             const stats = useMemo(() => {
                 const activeEntries = entries.filter(e => !e.isDeleted && e.status !== 'İptal');
-                
+
                 const totalRevenue = activeEntries.reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-                const currentMonth = new Date().toISOString().slice(0, 7);
+                const currentMonth = getTurkeyMonth();
                 const monthlyRevenue = activeEntries.filter(e => e.date.startsWith(currentMonth)).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-                const todayStr = new Date().toISOString().split('T')[0];
+                const todayStr = getTurkeyDate();
                 const dailyRevenue = activeEntries.filter(e => e.date === todayStr).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
                 const deliveredEntries = activeEntries.filter(e => e.status === 'Teslim Edildi');
                 const pendingEntries = activeEntries.filter(e => e.status === 'Teslim Edilmedi');
@@ -636,23 +758,22 @@
                 const deliveryRate = Math.round((deliveredCount / totalCount) * 100);
                 const last7Days = [];
                 for (let i = 6; i >= 0; i--) {
-                    const d = new Date();
-                    d.setDate(d.getDate() - i); const dStr = d.toISOString().split('T')[0];
+                    const dStr = addDaysToTurkeyDate(todayStr, -i);
                     const dayAmount = activeEntries.filter(e => e.date === dStr).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
-                    last7Days.push({ date: d.toLocaleDateString('tr-TR', {day: 'numeric', month: 'short'}), amount: dayAmount, rawDate: dStr });
+                    last7Days.push({ date: formatDateTR(dStr), amount: dayAmount, rawDate: dStr });
                 }
                 const maxDayAmount = Math.max(...last7Days.map(d => d.amount)) || 1;
-                const officeStats = {}; 
+                const officeStats = {};
                 const dailyOfficeStats = {};
                 const monthlyOfficeStats = {};
                 const staffStats = {};
                 const dailyStaffStats = {};
                 const monthlyStaffStats = {};
 
-                activeEntries.forEach(e => { 
-                    const office = e.office || 'Belirtilmemiş'; 
+                activeEntries.forEach(e => {
+                    const office = e.office || 'Belirtilmemiş';
                     const amount = parseFloat(e.amount) || 0;
-                    officeStats[office] = (officeStats[office] || 0) + amount; 
+                    officeStats[office] = (officeStats[office] || 0) + amount;
                     if (e.date === todayStr) dailyOfficeStats[office] = (dailyOfficeStats[office] || 0) + amount;
                     if (e.date.startsWith(currentMonth)) monthlyOfficeStats[office] = (monthlyOfficeStats[office] || 0) + amount;
                     staffStats[e.staffName] = (staffStats[e.staffName] || 0) + amount;
@@ -660,10 +781,10 @@
                     if (e.date.startsWith(currentMonth)) monthlyStaffStats[e.staffName] = (monthlyStaffStats[e.staffName] || 0) + amount;
                 });
                 const sortStats = (statsObj) => Object.entries(statsObj).sort(([,a], [,b]) => b - a).slice(0, 5);
-                return { 
-                    totalRevenue, monthlyRevenue, dailyRevenue, 
-                    deliveryStats: { deliveredCount, pendingCount, deliveryRate, deliveredAmount, pendingAmount }, 
-                    last7Days, maxDayAmount, 
+                return {
+                    totalRevenue, monthlyRevenue, dailyRevenue,
+                    deliveryStats: { deliveredCount, pendingCount, deliveryRate, deliveredAmount, pendingAmount },
+                    last7Days, maxDayAmount,
                     officeStats, dailyOfficeStats, monthlyOfficeStats,
                     sortedStaffTotal: sortStats(staffStats), sortedStaffDaily: sortStats(dailyStaffStats), sortedStaffMonthly: sortStats(monthlyStaffStats)
                 };
@@ -692,10 +813,10 @@
             };
             const getDayTotal = (day) => {
                 if (!day) return 0;
-                const dateStr = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day + 1).toISOString().split('T')[0];
-                return getDailyTransactions(dateStr).reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
+                const dateStr = `${calendarDate.getFullYear()}-${String(calendarDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                return getDailyTransactions(dateStr).filter(e => e.status !== 'İptal').reduce((acc, curr) => acc + (parseFloat(curr.amount) || 0), 0);
             };
-            
+
             if (!user) {
                 return (
                     <div className={`min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900 p-4 transition-colors duration-300`}>
@@ -719,7 +840,7 @@
                    {deleteConfirmId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full"><h3 className="text-lg font-bold text-slate-900 dark:text-white text-center">Çöp Kutusuna Taşı?</h3><p className="text-slate-500 dark:text-slate-400 mt-1 text-sm text-center">Bu kaydı daha sonra geri yükleyebilirsiniz.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setDeleteConfirmId(null)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-200">İptal</button><button onClick={confirmSoftDelete} className="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700">Sil</button></div></div></div>)}
                    {permanentDeleteId && (<div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"><div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl p-6 max-w-sm w-full border-2 border-red-500"><h3 className="text-lg font-bold text-red-600 text-center">DİKKAT: KALICI SİLME!</h3><p className="text-slate-500 dark:text-slate-400 mt-1 text-sm text-center">Bu işlem geri alınamaz. Kayıt tamamen yok olacak.</p><div className="flex gap-3 w-full mt-4"><button onClick={() => setPermanentDeleteId(null)} className="flex-1 py-2 bg-slate-100 dark:bg-slate-700 rounded text-slate-700 dark:text-slate-200">Vazgeç</button><button onClick={confirmPermanentDelete} className="flex-1 py-2 bg-red-600 text-white rounded hover:bg-red-700 font-bold">KALICI SİL</button></div></div></div>)}
                    {imagePreviewUrl && (<div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={() => setImagePreviewUrl(null)}><div className="bg-white dark:bg-slate-800 p-2 rounded-lg max-w-3xl max-h-[90vh] overflow-auto"><img src={imagePreviewUrl} alt="Dekont" className="max-w-full h-auto rounded" /><div className="text-center mt-2 text-sm text-slate-500 dark:text-slate-400">Kapatmak için dışarı tıklayın</div></div></div>)}
-                   
+
                     {showReportModal && (
                         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                             <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl border dark:border-slate-700 p-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
@@ -735,14 +856,14 @@
                                         <p className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{formatCurrency(totalAmount)}</p>
                                     </div>
                                     <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-900/30">
-                                        <p className="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">İşlem Adedi</p>
-                                        <p className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{filteredEntries.length} Adet</p>
+                                        <p className="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">Aktif İşlem Adedi</p>
+                                        <p className="text-2xl font-bold text-slate-800 dark:text-white mt-1">{filteredActiveEntries.length} Adet</p>
                                     </div>
                                 </div>
                                 <div className="space-y-4">
                                     <h4 className="font-semibold text-sm uppercase text-slate-500 dark:text-slate-400 border-b dark:border-slate-700 pb-2">Ofis Bazlı Dağılım</h4>
                                     <div className="max-h-60 overflow-y-auto pr-2 history-scroll">
-                                        {Object.entries(filteredEntries.reduce((acc, curr) => {
+                                        {Object.entries(filteredActiveEntries.reduce((acc, curr) => {
                                             acc[curr.office || 'Belirsiz'] = (acc[curr.office || 'Belirsiz'] || 0) + parseFloat(curr.amount);
                                             return acc;
                                         }, {})).sort(([,a], [,b]) => b - a).map(([office, total]) => (
@@ -769,7 +890,7 @@
                             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div className="space-y-2"><label className="text-sm font-semibold">Makbuz No</label><input type="text" value={editingItem.receiptNo} onChange={(e) => setEditingItem(p => ({...p, receiptNo: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg font-mono bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:border-blue-500" /></div>
                                     <div className="space-y-2"><label className="text-sm font-semibold">Tarih</label><input type="date" value={editingItem.date} onChange={(e) => setEditingItem(p => ({...p, date: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900" /></div>
-                                    <div className="space-y-2"><label className="text-sm font-semibold">Tutar (TL)</label><input type="number" value={editingItem.amount} onChange={(e) => setEditingItem(p => ({...p, amount: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg font-mono dark:bg-slate-900" /></div>
+                                    <div className="space-y-2"><label className="text-sm font-semibold">Tutar (TL)</label><input type="number" min="0.01" step="0.01" value={editingItem.amount} onChange={(e) => setEditingItem(p => ({...p, amount: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg font-mono dark:bg-slate-900" /></div>
                                     <div className="space-y-2"><label className="text-sm font-semibold">Personel</label><input type="text" value={editingItem.staffName} onChange={(e) => setEditingItem(p => ({...p, staffName: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900" /></div>
                                     <div className="space-y-2"><label className="text-sm font-semibold">Müşteri</label><input type="text" value={editingItem.customerName} onChange={(e) => setEditingItem(p => ({...p, customerName: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900" /></div>
                                     <div className="space-y-2"><label className="text-sm font-semibold">Telefon</label><input type="tel" value={editingItem.customerPhone || ''} onChange={(e) => setEditingItem(p => ({...p, customerPhone: e.target.value}))} className="w-full p-2.5 border dark:border-slate-600 rounded-lg dark:bg-slate-900" placeholder="05XX..." /></div>
@@ -792,7 +913,7 @@
                                                 {editingItem.history.slice().reverse().map((h, index) => (
                                                     <div key={index} className="text-xs text-slate-600 dark:text-slate-400 flex justify-between items-center border-b border-slate-200 dark:border-slate-700 last:border-0 pb-1.5 mb-1.5 last:pb-0 last:mb-0">
                                                         <span className="font-medium flex-1">{h.action}</span>
-                                                        <span className="text-slate-400 dark:text-slate-500 font-mono text-[10px] ml-2">{new Date(h.updatedAt).toLocaleString('tr-TR')}</span>
+                                                        <span className="text-slate-400 dark:text-slate-500 font-mono text-[10px] ml-2">{formatDateTimeTR(h.updatedAt)}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -807,7 +928,7 @@
                     <div className="max-w-6xl mx-auto space-y-6">
                         {/* --- MODERNİZE EDİLMİŞ ÜST BİLGİ VE MENÜ KISMI --- */}
                         <div className="relative overflow-hidden bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl p-6 rounded-2xl shadow-lg border border-slate-200/50 dark:border-slate-700/50 flex flex-col lg:flex-row items-center justify-between gap-6 transition-all duration-300">
-                            
+
                             {/* Arka Plan Dekoratif Parlama Efektleri */}
                             <div className={`absolute -top-10 -right-10 w-40 h-40 bg-${themeColor}-500/10 rounded-full blur-3xl pointer-events-none`}></div>
                             <div className={`absolute -bottom-10 -left-10 w-40 h-40 bg-blue-500/10 rounded-full blur-3xl pointer-events-none`}></div>
@@ -818,13 +939,13 @@
                                 <div className={`p-3.5 bg-gradient-to-br from-${themeColor}-500 to-${themeColor}-700 rounded-2xl shadow-lg shadow-${themeColor}-500/30 text-white transform rotate-3 hover:rotate-0 transition-transform duration-300`}>
                                     <Icons.Cloud className="w-8 h-8" />
                                 </div>
-                                
+
                                 <div>
                                     {/* Gradient Başlık */}
                                     <h1 className="text-2xl sm:text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-slate-500 dark:from-white dark:to-slate-400 tracking-tight">
                                         Peşinat Takip Sistemi
                                     </h1>
-                                    
+
                                     {/* Modern Kullanıcı Rozetleri */}
                                     <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2.5">
                                         <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-100/80 dark:bg-slate-900/50 rounded-full border border-slate-200 dark:border-slate-700 backdrop-blur-sm">
@@ -846,7 +967,7 @@
 
                             {/* Sağ Taraf: İOS Tarzı Segmented Control ve Aksiyonlar */}
                             <div className="relative z-10 flex flex-wrap items-center justify-center gap-2 bg-slate-100/50 dark:bg-slate-900/50 backdrop-blur-md p-1.5 rounded-xl border border-white/60 dark:border-slate-700/50 shadow-inner w-full lg:w-auto">
-                                
+
                                 {/* Görünüm Butonları */}
                                 <button onClick={() => setViewMode('list')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all duration-300 ${viewMode === 'list' ? `bg-white dark:bg-slate-700 shadow-md text-${themeColor}-600 dark:text-${themeColor}-400 scale-105` : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'}`}><Icons.List className="w-4 h-4" /> Liste</button>
                                 <button onClick={() => setViewMode('dashboard')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all duration-300 ${viewMode === 'dashboard' ? `bg-white dark:bg-slate-700 shadow-md text-${themeColor}-600 dark:text-${themeColor}-400 scale-105` : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-white/50 dark:hover:bg-slate-800/50'}`}><Icons.LayoutDashboard className="w-4 h-4" /> İstatistik</button>
@@ -858,7 +979,7 @@
                                 {/* Aksiyon İkonları (Tema, Yedek, Çıkış vb.) */}
                                 <div className="flex items-center gap-1">
                                     {installPrompt && <button onClick={handleInstallClick} className={`p-2 rounded-lg bg-${themeColor}-100 text-${themeColor}-600 hover:bg-${themeColor}-200 dark:bg-${themeColor}-900/50 dark:text-${themeColor}-300 transition-all`} title="Uygulamayı Yükle"><Icons.Smartphone className="w-4 h-4" /></button>}
-                                    
+
                                     {/* Tema Rengi Seçici (Daha şık hover efektli) */}
                                     <div className="flex items-center gap-1.5 px-2">
                                         {['blue', 'emerald', 'violet', 'amber'].map(color => (
@@ -867,14 +988,14 @@
                                     </div>
 
                                     <button onClick={() => setDarkMode(!darkMode)} className="p-2.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-sm hover:shadow" title={darkMode ? "Aydınlık Mod" : "Karanlık Mod"}>{darkMode ? <Icons.Sun className="w-4 h-4" /> : <Icons.Moon className="w-4 h-4" />}</button>
-                                    
+
                                     {isAdmin && (
                                         <>
                                             <input type="file" ref={uploadFileInputRef} onChange={handleJsonUpload} accept=".json" className="hidden" />
                                             <button onClick={() => uploadFileInputRef.current.click()} className="p-2.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-white dark:hover:bg-slate-800 transition-all shadow-sm hover:shadow" title="Yedek Yükle (Restore)"><Icons.Upload className="w-4 h-4" /></button>
                                         </>
                                     )}
-                                    
+
                                     <button onClick={handleLogout} className="p-2.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 transition-all shadow-sm hover:shadow group" title="Çıkış Yap">
                                         <Icons.Lock className="w-4 h-4 group-hover:scale-110 transition-transform" />
                                     </button>
@@ -909,11 +1030,11 @@
                                                 return (
                                                     <div key={i} className="flex-1 flex flex-col items-center justify-end h-full group">
                                                         <div className="relative w-full flex justify-center h-full items-end">
-                                                            <div 
-                                                                style={{ 
+                                                            <div
+                                                                style={{
                                                                     height: `${heightPercent}%`,
                                                                     backgroundColor: darkMode ? darkThemeHex[themeColor] : themeHex[themeColor]
-                                                                }} 
+                                                                }}
                                                                 className="w-full max-w-[30px] rounded-t-lg transition-all duration-1000 relative opacity-80 group-hover:opacity-100"
                                                             >
                                                                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">{formatCurrency(day.amount)}</div>
@@ -925,7 +1046,7 @@
                                             })}
                                         </div>
                                     </div>
-                                 
+
                                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-center">
                                         <h3 className="font-bold text-slate-700 dark:text-slate-200 mb-6 flex items-center gap-2"><Icons.Package className="w-5 h-5 text-orange-500" /> Teslimat Durumu (Tutar)</h3>
                                         <div className="space-y-6">
@@ -1062,8 +1183,8 @@
                                 <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
                                     <div className="flex justify-between items-center mb-6">
                                         <h3 className="font-bold text-slate-700 dark:text-slate-200 text-xl flex items-center gap-2">
-                                            <Icons.CalendarCheck className={`w-6 h-6 text-${themeColor}-500`} /> 
-                                            {calendarDate.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })}
+                                            <Icons.CalendarCheck className={`w-6 h-6 text-${themeColor}-500`} />
+                                            {formatMonthTR(calendarDate)}
                                         </h3>
                                         <div className="flex gap-2">
                                             <button onClick={() => changeMonth(-1)} className="px-3 py-1 bg-slate-100 dark:bg-slate-700 rounded hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 font-bold">←</button>
@@ -1080,11 +1201,11 @@
                                         {getCalendarDays(calendarDate.getFullYear(), calendarDate.getMonth()).map((day, i) => {
                                             if (day === null) return <div key={i} className="h-24 bg-transparent"></div>;
                                             const total = getDayTotal(day);
-                                            const currentDateStr = new Date(calendarDate.getFullYear(), calendarDate.getMonth(), day + 1).toISOString().split('T')[0];
+                                            const currentDateStr = `${calendarDate.getFullYear()}-${String(calendarDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                                             const isSelected = selectedCalendarDate === currentDateStr;
                                             return (
-                                                <button 
-                                                    key={i} 
+                                                <button
+                                                    key={i}
                                                     onClick={() => { if (total > 0) setSelectedCalendarDate(currentDateStr); else setSelectedCalendarDate(null); }}
                                                     className={`h-24 rounded-lg border flex flex-col items-center justify-center relative transition-all ${isSelected ? `border-${themeColor}-500 ring-2 ring-${themeColor}-200 dark:ring-${themeColor}-900` : 'border-slate-100 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'} ${total > 0 ? `bg-${themeColor}-50 dark:bg-${themeColor}-900/20 cursor-pointer` : 'bg-white dark:bg-slate-800/50 cursor-default'}`}
                                                 >
@@ -1094,40 +1215,40 @@
                                             );
                                         })}
                                     </div>
-                                    
+
                                     {/* --- EKLENEN TOPLA BUTONU VE SONUÇ EKRANI --- */}
                                     <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-100 dark:border-slate-700 pt-4">
-                                        <button 
+                                        <button
                                             onClick={() => {
                                                 const year = calendarDate.getFullYear();
                                                 const monthStr = String(calendarDate.getMonth() + 1).padStart(2, '0');
                                                 const searchPrefix = `${year}-${monthStr}`;
-                                                
+
                                                 // O aya ait, silinmemiş ve iptal edilmemiş kayıtların tutarlarını toplar
                                                 const total = entries
                                                     .filter(e => !e.isDeleted && e.status !== 'İptal' && e.date.startsWith(searchPrefix))
                                                     .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-                                                    
+
                                                 setMonthTotal(total);
                                             }}
                                             className={`px-6 py-2.5 bg-${themeColor}-600 hover:bg-${themeColor}-700 text-white rounded-lg font-bold shadow flex items-center gap-2 transition-all`}
                                         >
                                             <Icons.Wallet className="w-5 h-5" /> Topla
                                         </button>
-                                        
+
                                         {monthTotal !== null && (
                                             <div className={`px-6 py-3 bg-${themeColor}-50 dark:bg-${themeColor}-900/30 border border-${themeColor}-200 dark:border-${themeColor}-800 rounded-lg text-lg font-bold text-${themeColor}-700 dark:text-${themeColor}-300 flex-1 text-center sm:text-right animate-in fade-in`}>
-                                                {calendarDate.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' })} Toplamı: {formatCurrency(monthTotal)}
+                                                {formatMonthTR(calendarDate)} Toplamı: {formatCurrency(monthTotal)}
                                             </div>
                                         )}
                                     </div>
                                     {/* --- EKLENEN KISIM SONU --- */}
                                 </div>
-                                
+
                                 {selectedCalendarDate && (
                                     <div className="bg-white dark:bg-slate-800 p-6 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm animate-in fade-in slide-in-from-top-4">
                                         <div className="flex justify-between items-center mb-4">
-                                            <h3 className="font-bold text-slate-700 dark:text-slate-200 text-lg">{new Date(selectedCalendarDate).toLocaleDateString('tr-TR')} Tarihli İşlemler</h3>
+                                            <h3 className="font-bold text-slate-700 dark:text-slate-200 text-lg">{formatDateTR(selectedCalendarDate)} Tarihli İşlemler</h3>
                                             <button onClick={() => setSelectedCalendarDate(null)} className="text-slate-400 hover:text-slate-600"><Icons.X className="w-5 h-5" /></button>
                                         </div>
                                         <div className="overflow-x-auto">
@@ -1158,7 +1279,7 @@
                             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                                 <h2 className="text-lg font-semibold mb-4 text-slate-700 dark:text-slate-200 flex items-center gap-2"><Icons.PlusCircle className="w-5 h-5" /> Yeni Kayıt Ekle</h2>
                                 <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
-                                    <div className="space-y-1 lg:col-span-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1"><Icons.Ticket className="w-3 h-3" /> Makbuz No</label><input type="text" name="receiptNo" value={formData.receiptNo} onChange={(e) => setFormData(p => ({...p, receiptNo: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 font-mono text-blue-800 dark:text-blue-300 font-bold focus:border-blue-500" /></div>
+                                    <div className="space-y-1 lg:col-span-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1"><Icons.Ticket className="w-3 h-3" /> Makbuz No</label><input type="text" name="receiptNo" value={formData.receiptNo} readOnly className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900 font-mono text-blue-800 dark:text-blue-300 font-bold cursor-not-allowed" title="Kayıt sırasında güvenli sayaçtan otomatik atanır" /></div>
                                     <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tarih</label><input type="date" name="date" value={formData.date} onChange={(e) => setFormData(p => ({...p, date: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" required /></div>
                                     <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Personel</label><input type="text" name="staffName" placeholder="Örn: Ahmet" value={formData.staffName} onChange={(e) => setFormData(p => ({...p, staffName: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" required /></div>
                                     <div className="space-y-1">
@@ -1170,7 +1291,7 @@
                                     </div>
                                     <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Müşteri</label><input type="text" name="customerName" placeholder="Örn: Ayşe" value={formData.customerName} onChange={(e) => setFormData(p => ({...p, customerName: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" required /></div>
                                     <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Telefon</label><input type="tel" name="customerPhone" placeholder="05XX..." value={formData.customerPhone} onChange={(e) => setFormData(p => ({...p, customerPhone: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" /></div>
-                                    <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tutar (TL)</label><input type="number" name="amount" placeholder="0.00" value={formData.amount} onChange={(e) => setFormData(p => ({...p, amount: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-green-500 font-mono dark:bg-slate-900" required /></div>
+                                    <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tutar (TL)</label><input type="number" name="amount" min="0.01" step="0.01" placeholder="0.00" value={formData.amount} onChange={(e) => setFormData(p => ({...p, amount: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-green-500 font-mono dark:bg-slate-900" required /></div>
                                     <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1"><Icons.Paperclip className="w-3 h-3" /> Dekont</label><input type="file" ref={fileInputRef} accept="image/*" onChange={(e) => handleImageUpload(e.target.files[0], (base64) => setFormData(p => ({...p, image: base64})))} className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-blue-50 dark:bg-slate-700 file:text-blue-700 dark:text-blue-300"/></div>
                                     <div className="lg:col-span-7 mt-2">
                                         <label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1 mb-1"><Icons.StickyNote className="w-3 h-3" /> Açıklama / Not</label>
@@ -1233,13 +1354,13 @@
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                                                {currentItems.map((entry) => {	
+                                                {currentItems.map((entry) => {
                                                     const isDelivered = entry.status === 'Teslim Edildi';
                                                     const isCancelled = entry.status === 'İptal';
                                                     return (
                                                         <tr key={entry.id} className={`hover:bg-${themeColor}-50 dark:hover:bg-${themeColor}-900/10 transition-colors group`}>
                                                             <td className={`p-4 font-mono font-bold text-${themeColor}-900 dark:text-${themeColor}-300`}>{entry.receiptNo || '-'}</td>
-                                                            <td className="p-4 text-slate-600 dark:text-slate-400 text-sm">{new Date(entry.date).toLocaleDateString('tr-TR')}</td>
+                                                            <td className="p-4 text-slate-600 dark:text-slate-400 text-sm">{formatDateTR(entry.date)}</td>
                                                             <td className="p-4 text-slate-800 dark:text-slate-200 font-medium">{entry.staffName}</td>
                                                             <td className="p-4 text-slate-600 dark:text-slate-400 text-sm">{entry.office}</td>
                                                             <td className="p-4">
@@ -1280,7 +1401,7 @@
                                             <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                                                 <span>Göster:</span>
                                                 <select value={itemsPerPage} onChange={(e) => { setItemsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="border rounded p-1 dark:bg-slate-900 outline-none">
-                                                    <option value={50}>50</option><option value={100}>100</option><option value={filteredEntries.length}>Tümü</option>
+                                                    <option value={50}>50</option><option value={100}>100</option><option value={Math.max(filteredEntries.length, 1)}>Tümü</option>
                                                 </select>
                                                 <span className="hidden md:inline"> | Toplam {filteredEntries.length} kayıt, {totalPages} sayfa</span>
                                             </div>
