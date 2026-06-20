@@ -645,6 +645,7 @@
                     const historyEntry = { updatedAt: new Date().toISOString(), action: actionText, user: user.email };
                     const updateData = { ...editingItem, amount, history: [...(editingItem.history || []), historyEntry] };
                     delete updateData.original;
+                    delete updateData.id;
                     await updateDoc(doc(db, DB_COLLECTION, editingItem.id), updateData);
                     await createAuditLog('Kayıt düzenlendi', { entryId: editingItem.id, receiptNo: editingItem.receiptNo, changes });
                     setEditingItem(null);
