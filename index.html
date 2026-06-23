@@ -331,7 +331,7 @@
                 .replace(/>/g, '&gt;')
                 .replace(/"/g, '&quot;')
                 .replace(/'/g, '&#39;');
-            const createEntryWithReceipt = async (entryData) => {
+            const createEntryWithReceipt = async (entryData, requestedReceiptNo = '') => {
                 return runTransaction(db, async (transaction) => {
                     const counterRef = doc(db, META_COLLECTION, RECEIPT_COUNTER_DOC);
                     const counterSnap = await transaction.get(counterRef);
@@ -339,11 +339,12 @@
                         counterSnap.exists() ? Number(counterSnap.data().lastReceiptNo || 0) : 0,
                         getMaxReceiptNoFromEntries(entries)
                     );
-                    const nextNo = currentNo + 1;
+                    const manualNo = parseReceiptNo(requestedReceiptNo);
+                    const nextNo = manualNo || currentNo + 1;
                     const receiptNo = formatReceiptNo(nextNo);
                     const entryRef = doc(collection(db, DB_COLLECTION));
                     transaction.set(counterRef, {
-                        lastReceiptNo: nextNo,
+                        lastReceiptNo: Math.max(currentNo, nextNo),
                         updatedAt: new Date().toISOString(),
                         updatedBy: user.email
                     }, { merge: true });
@@ -575,9 +576,12 @@
                 const amount = toValidAmount(formData.amount);
                 if (!amount) return alert("Tutar 0'dan büyük olmalıdır.");
                 if (!formData.staffName || !formData.customerName || !formData.date) return alert("Personel, müşteri ve tarih zorunludur.");
+                const requestedReceiptNo = formatReceiptNo(parseReceiptNo(formData.receiptNo));
+                if (!requestedReceiptNo || requestedReceiptNo === '000000') return alert("Geçerli bir makbuz numarası girin.");
+                if (entries.some(entry => entry.receiptNo === requestedReceiptNo)) return alert(`${requestedReceiptNo} makbuz numarası zaten kullanılıyor.`);
                 try {
                     const newEntry = { ...formData, amount, status: 'Teslim Edilmedi', history: [], createdAt: new Date().toISOString(), createdBy: user.email, isDeleted: false };
-                    const receiptNo = await createEntryWithReceipt(newEntry);
+                    const receiptNo = await createEntryWithReceipt(newEntry, requestedReceiptNo);
                     await createAuditLog('Kayıt oluşturuldu', { receiptNo, customerName: formData.customerName, amount, office: formData.office });
 
                     if(getManagerPhone(newEntry)) {
@@ -1514,7 +1518,7 @@
                             <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
                                 <h2 className="text-lg font-semibold mb-4 text-slate-700 dark:text-slate-200 flex items-center gap-2"><Icons.PlusCircle className="w-5 h-5" /> Yeni Kayıt Ekle</h2>
                                 <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
-                                    <div className="space-y-1 lg:col-span-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1"><Icons.Ticket className="w-3 h-3" /> Makbuz No</label><input type="text" name="receiptNo" value={formData.receiptNo} readOnly className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900 font-mono text-blue-800 dark:text-blue-300 font-bold cursor-not-allowed" title="Kayıt sırasında güvenli sayaçtan otomatik atanır" /></div>
+                                    <div className="space-y-1 lg:col-span-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1"><Icons.Ticket className="w-3 h-3" /> Makbuz No</label><input type="text" name="receiptNo" value={formData.receiptNo} onChange={(e) => setFormData(p => ({...p, receiptNo: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 font-mono text-blue-800 dark:text-blue-300 font-bold focus:border-blue-500" title="Otomatik gelir; gerekirse elle düzeltilebilir" /></div>
                                     <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Tarih</label><input type="date" name="date" value={formData.date} onChange={(e) => setFormData(p => ({...p, date: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" required /></div>
                                     <div className="space-y-1"><label className="text-xs font-medium text-slate-500 dark:text-slate-400">Personel</label><input type="text" name="staffName" placeholder="Örn: Ahmet" value={formData.staffName} onChange={(e) => setFormData(p => ({...p, staffName: e.target.value}))} className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-lg outline-none focus:border-blue-500 dark:bg-slate-900" required /></div>
                                     <div className="space-y-1">
