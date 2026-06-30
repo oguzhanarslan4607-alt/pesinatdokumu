@@ -661,27 +661,7 @@
                 if (!window.confirm(`"${entry.customerName}" adlı müşterinin durumunu "${nextStatus}" olarak değiştirmek istediğinize emin misiniz?`)) return;
                 try {
                     const historyEntry = { updatedAt: new Date().toISOString(), action: 'Durum Değişti: ' + nextStatus, user: user.email };
-                    const updatePayload = {
-                        receiptNo: (entry.receiptNo || '').toString().trim(),
-                        date: entry.date || getTurkeyDate(),
-                        staffName: (entry.staffName || '').toString().trim(),
-                        office: (entry.office || '').toString().trim(),
-                        customerName: (entry.customerName || '').toString().trim(),
-                        customerPhone: (entry.customerPhone || '').toString().trim(),
-                        managerPhone: (entry.managerPhone || '').toString().trim(),
-                        amount: toValidAmount(entry.amount),
-                        image: entry.image || null,
-                        note: entry.note || '',
-                        status: nextStatus,
-                        history: [...(entry.history || []), historyEntry],
-                        createdAt: entry.createdAt || new Date().toISOString(),
-                        createdBy: entry.createdBy || user.email,
-                        isDeleted: Boolean(entry.isDeleted)
-                    };
-                    if (!updatePayload.receiptNo || !updatePayload.date || !updatePayload.staffName || !updatePayload.customerName || !updatePayload.amount) {
-                        return alert("Bu kayıtta eksik bilgi olduğu için durum değiştirilemedi. Lütfen önce düzenleme ekranından zorunlu alanları kontrol edin.");
-                    }
-                    await updateDoc(doc(db, DB_COLLECTION, entry.id), updatePayload);
+                    await updateDoc(doc(db, DB_COLLECTION, entry.id), { status: nextStatus, history: [...(entry.history || []), historyEntry] });
                     await createAuditLog('Durum değişti', { entryId: entry.id, receiptNo: entry.receiptNo, status: nextStatus });
                 } catch (error) { console.error(error); alert("Durum kaydedilemedi: " + error.message);
                 }
